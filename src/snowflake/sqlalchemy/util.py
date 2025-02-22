@@ -1,7 +1,3 @@
-#
-# Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
-#
-
 import re
 from itertools import chain
 from typing import Any
@@ -9,13 +5,11 @@ from urllib.parse import quote_plus
 
 from sqlalchemy import exc, inspection, sql
 from sqlalchemy.exc import NoForeignKeysError
-from sqlalchemy.orm.interfaces import MapperProperty
-from sqlalchemy.orm.util import _ORMJoin as sa_orm_util_ORMJoin
-from sqlalchemy.orm.util import attributes
+from sqlalchemy.orm import attributes, interfaces
 from sqlalchemy.sql import util as sql_util
 from sqlalchemy.sql.base import _expand_cloned, _from_objects
 from sqlalchemy.sql.elements import _find_columns
-from sqlalchemy.sql.selectable import Join, Lateral, coercions, operators, roles
+from sqlalchemy.sql.selectable import Join, Lateral, operators, roles
 
 from snowflake.connector.compat import IS_STR
 from snowflake.connector.connection import SnowflakeConnection
@@ -195,7 +189,7 @@ def _find_left_clause_to_join_from(clauses, join_to, onclause):
         return idx
 
 
-class _Snowflake_ORMJoin(sa_orm_util_ORMJoin):
+class _Snowflake_ORMJoin(interfaces.ORMJoin):
     def __init__(
         self,
         left,
@@ -228,7 +222,7 @@ class _Snowflake_ORMJoin(sa_orm_util_ORMJoin):
             on_selectable = onclause.comparator._source_selectable()
             prop = onclause.property
             _extra_criteria += onclause._extra_criteria
-        elif isinstance(onclause, MapperProperty):
+        elif isinstance(onclause, interfaces.MapperProperty):
             # used internally by joined eager loader...possibly not ideal
             prop = onclause
             on_selectable = prop.parent.selectable

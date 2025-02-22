@@ -23,13 +23,13 @@ def args_reducer(positions_to_drop: tuple):
 
     def fn_wrapper(fn: Callable):
         @functools.wraps(fn)
-        def wrapper(*args):
+        def wrapper(*args, **kwargs):
             reduced_args = args
             if not IS_VERSION_20:
                 reduced_args = tuple(
                     arg for idx, arg in enumerate(args) if idx not in positions_to_drop
                 )
-            fn(*reduced_args)
+            return fn(*reduced_args, **kwargs)
 
         return wrapper
 

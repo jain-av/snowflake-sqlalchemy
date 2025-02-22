@@ -1,7 +1,3 @@
-#
-# Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
-#
-
 import itertools
 import operator
 import re
@@ -896,6 +892,135 @@ class SnowflakeExecutionContext(default.DefaultExecutionContext):
     def rowcount(self):
         return self.cursor.rowcount
 
+
+class SnowflakeDDLCompiler(compiler.DDLCompiler):
+    def denormalize_column_name(self, name):
+        if name is None:
+            return None
+        elif name.lower() == name and not self.preparer._requires_quotes(name.lower()):
+            # no quote as case insensitive
+            return name
+        return self.preparer.quote(name)
+
+    def get_column_specification(self, column, **kwargs):
+        """
+        Gets Column specifications
+        """
+        colspec = [
+            self.preparer.format_column(column),
+            self.dialect.type_compiler.process(column.type, type_expression=column),
+        ]
+
+        has_identity = (
+            column.identity is not None and self.dialect.supports_identity_columns
+        )
+
+        if not column.nullable:
+            colspec.append("NOT NULL")
+
+        default = self.get_column_default_string(column)
+        if default is not None:
+            colspec.append("DEFAULT " + default)
+
+        # TODO: This makes the first INTEGER column AUTOINCREMENT.
+        # But the column is not really considered so unless
+        # postfetch_lastrowid is enabled. But it is very unlikely to happen...
+        if (
+            column.table is not None
+            and column is column.table._autoincrement_column
+            and column.server_default is None
+        ):
+            if isinstance(column.default, Sequence):
+                colspec.append(
+                    f"DEFAULT {self.dialect.identifier_preparer.format_sequence(column.default)}.nextval"
+                )
+            else:
+                colspec.append("AUTOINCREMENT")
+
+        if has_identity:
+            colspec.append(self.process(column.identity))
+
+        return " ".join(colspec)
+
+    def handle_cluster_by(self, table):
+        """
+        Handles snowflake-specific ``CREATE TABLE ... CLUSTER BY`` syntax.
+
+        Users can specify the `clusterby` property per table
+        using the dialect specific syntax.
+        For example, to specify a cluster by key you apply the following:
+
+        >>> import sqlalchemy as sa
+        >>> from sqlalchemy.schema import CreateTable
+        >>> engine = sa.create_engine('snowflake://om1')
+        >>> metadata = sa.MetaData()
+        >>> user = sa.Table(
+        ...     'user',
+        ...     metadata,
+        ...     sa.Column('id', sa.Integer, primary_key=True),
+        ...     sa.Column('name', sa.String),
+        ...     snowflake_clusterby=['id', 'name', text("id > 5")]
+        ... )
+        >>> print(CreateTable(user).compile(engine))
+        <BLANKLINE>
+        CREATE TABLE "user" (
+            id INTEGER NOT NULL AUTOINCREMENT,
+            name VARCHAR,
+            PRIMARY KEY (id)
+        ) CLUSTER BY (id, name, id > 5)
+        <BLANKLINE>
+        <BLANKLINE>
+        """
+        text = ""
+        info = table.dialect_options[DIALECT_NAME]
+        cluster = info.get("clusterby")
+        if cluster:
+            text += " CLUSTER BY ({})".format(
+                ", ".join(
+                    (
+                        self.denormalize_column_name(key)
+                        if isinstance(key, str)
+                        else str(key)
+                    )
+                    for key in cluster
+                )
+            )
+        return text
+
+    def post_create_table(self, table):
+        text = self.handle_cluster_by(table)
+        options = []
+        invalid_options: List[str] = []
+
+        for key, option in table.dialect_options[DIALECT_NAME].items():
+            if isinstance(option, TableOption):
+                options.append(option)
+            elif key not in ["clusterby", "*"]:
+                invalid_options.append(key)
+
+        if len(invalid_options) > 0:
+            raise UnexpectedOptionTypeError(sorted(invalid_options))
+
+        if isinstance(table, CustomTableBase):
+            options.sort(key=lambda x: (x.priority.value, x.option_name), reverse=True)
+            for option in options:
+                text += "\t" + option.render_option(self)
+        elif len(options) > 0:
+            raise CustomOptionsAreOnlySupportedOnSnowflakeTables()
+
+        return text
+
+    def visit_create_stage(self, create_stage, **kw):
+        """
+        This visitor will create the SQL representation for a CREATE STAGE command.
+        """
+        return "CREATE {or_replace}{temporary}STAGE {}{} URL={}".format(
+            create_stage.stage.namespace,
+            create_stage.stage.name,
+            repr(create_stage.container),
+            or_replace="OR REPLACE " if create_stage.replace_if_exists else "",
+            temporary="TEMPORARY " if create_stage.temporary else "",
+        )
 
 class SnowflakeDDLCompiler(compiler.DDLCompiler):
     def denormalize_column_name(self, name):
