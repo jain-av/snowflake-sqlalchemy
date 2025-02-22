@@ -119,11 +119,10 @@ class LikeFunctionsTest(_LikeFunctionsTest):
 class SimpleUpdateDeleteTest(_SimpleUpdateDeleteTest):
     def test_update(self, connection):
         t = self.tables.plain_pk
-        r = connection.execute(t.update().where(t.c.id == 2), dict(data="d2_new"))
+        r = connection.execute(t.update().where(t.c.id == 2).values(data="d2_new"))
         assert not r.is_insert
         # snowflake returns a row with numbers of rows updated and number of multi-joined rows updated
-        assert r.returns_rows
-        assert r.rowcount == 1
+        assert r.returned_rowcount == 1
 
         eq_(
             connection.execute(t.select().order_by(t.c.id)).fetchall(),
@@ -135,8 +134,7 @@ class SimpleUpdateDeleteTest(_SimpleUpdateDeleteTest):
         r = connection.execute(t.delete().where(t.c.id == 2))
         assert not r.is_insert
         # snowflake returns a row with number of rows deleted
-        assert r.returns_rows
-        assert r.rowcount == 1
+        assert r.returned_rowcount == 1
         eq_(
             connection.execute(t.select().order_by(t.c.id)).fetchall(),
             [(1, "d1"), (3, "d3")],
