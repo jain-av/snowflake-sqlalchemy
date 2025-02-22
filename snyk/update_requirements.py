@@ -1,10 +1,9 @@
 from pathlib import Path
 
-import tomlkit
-
+import toml
 
 def sync():
-    pyproject = tomlkit.loads(Path("pyproject.toml").read_text())
+    pyproject = toml.loads(Path("pyproject.toml").read_text())
     snyk_reqiurements = Path("snyk/requirements.txt")
     dependencies = pyproject.get("project", {}).get("dependencies", [])
 
