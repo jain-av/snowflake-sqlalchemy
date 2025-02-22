@@ -4,12 +4,15 @@
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.orm import declarative_base
 
 from snowflake.sqlalchemy import IcebergTable
 
 
 @pytest.mark.aws
 def test_create_iceberg_table(engine_testaccount, snapshot):
+    Base = declarative_base()  # Create a base class for declarative models
+
     metadata = MetaData()
     external_volume_name = "exvol"
     create_external_volume = f"""
@@ -27,14 +30,16 @@ def test_create_iceberg_table(engine_testaccount, snapshot):
         """
     with engine_testaccount.connect() as connection:
         connection.exec_driver_sql(create_external_volume)
-    IcebergTable(
-        "Iceberg_Table_1",
-        metadata,
-        Column("id", Integer, primary_key=True),
-        Column("geom", String),
-        external_volume=external_volume_name,
-        base_location="my_iceberg_table",
-    )
+
+    # Define the Iceberg table using declarative base
+    class IcebergTable1(Base):
+        __tablename__ = "Iceberg_Table_1"
+        __table_args__ = {
+            "snowflake_external_volume": external_volume_name,
+            "snowflake_base_location": "my_iceberg_table",
+        }
+        id = Column(Integer, primary_key=True)
+        geom = Column(String)
 
     with pytest.raises(ProgrammingError) as argument_error:
         metadata.create_all(engine_testaccount)

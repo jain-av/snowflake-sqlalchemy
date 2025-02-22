@@ -4,7 +4,8 @@
 import pytest
 import sqlalchemy.exc
 from sqlalchemy import Column, Index, Integer, MetaData, String, select
-from sqlalchemy.orm import Session, declarative_base
+from sqlalchemy.orm import Session
+from sqlalchemy.ext.declarative import declarative_base
 
 from snowflake.sqlalchemy import HybridTable
 
@@ -68,7 +69,7 @@ def test_create_hybrid_table_with_multiple_index(
 @pytest.mark.aws
 def test_create_hybrid_table_with_orm(sql_compiler, engine_testaccount):
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestHybridTableOrm(Base):
         __tablename__ = "test_hybrid_table_orm"
@@ -89,7 +90,7 @@ def test_create_hybrid_table_with_orm(sql_compiler, engine_testaccount):
         instance = TestHybridTableOrm(id=0, name="name_example")
         session.add(instance)
         session.commit()
-        data = session.query(TestHybridTableOrm).all()
+        data = session.execute(select(TestHybridTableOrm)).scalars().all()
         assert str(data) == "[(0, 'name_example')]"
     finally:
         Base.metadata.drop_all(engine_testaccount)

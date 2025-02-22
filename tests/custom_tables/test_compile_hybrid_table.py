@@ -1,10 +1,9 @@
-#
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 #
 
 from sqlalchemy import Column, Integer, MetaData, String
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import ARRAY, GEOMETRY, HybridTable
 

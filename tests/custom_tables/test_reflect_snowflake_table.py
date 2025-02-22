@@ -2,7 +2,7 @@
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 #
 from sqlalchemy import MetaData, Table, inspect
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import SnowflakeTable
 
@@ -21,7 +21,8 @@ def test_simple_reflection_of_table_as_sqlalchemy_table(
         connection.exec_driver_sql(create_table_sql)
 
     snowflake_test_table = Table(table_name, metadata, autoload_with=engine_testaccount)
-    constraint = snowflake_test_table.constraints.pop()
+    constraint = next(iter(snowflake_test_table.constraints))
+    snowflake_test_table.constraints.remove(constraint)
     constraint.name = "demo_name"
     snowflake_test_table.constraints.add(constraint)
 
@@ -53,7 +54,8 @@ def test_simple_reflection_of_table_as_snowflake_table(
     snowflake_test_table = SnowflakeTable(
         table_name, metadata, autoload_with=engine_testaccount
     )
-    constraint = snowflake_test_table.constraints.pop()
+    constraint = next(iter(snowflake_test_table.constraints))
+    snowflake_test_table.constraints.remove(constraint)
     constraint.name = "demo_name"
     snowflake_test_table.constraints.add(constraint)
 
@@ -84,7 +86,7 @@ def test_inspect_snowflake_table(
 
     try:
         with engine_testaccount.connect() as conn:
-            insp = inspect(conn)
+            insp = inspect(engine_testaccount)
             table = insp.get_columns(table_name)
             assert table == snapshot
 

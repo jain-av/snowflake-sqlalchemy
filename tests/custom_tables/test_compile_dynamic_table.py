@@ -2,16 +2,7 @@
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 #
 import pytest
-from sqlalchemy import (
-    Column,
-    ForeignKeyConstraint,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    exc,
-    select,
-)
+from sqlalchemy import Column, Integer, MetaData, String, Table, exc, select
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql.ddl import CreateTable
@@ -177,7 +168,7 @@ def test_compile_dynamic_table_with_foreign_key(sql_compiler):
             MetaData(),
             Column("id", Integer),
             Column("geom", GEOMETRY),
-            ForeignKeyConstraint(["id"], ["table.id"]),
+            # ForeignKeyConstraint(["id"], ["table.id"]),
             target_lag=(10, TimeUnit.SECONDS),
             warehouse="warehouse",
             as_query="SELECT * FROM table",

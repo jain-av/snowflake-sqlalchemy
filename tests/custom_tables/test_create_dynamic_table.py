@@ -3,6 +3,7 @@
 #
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
+from sqlalchemy.orm import Session
 
 from snowflake.sqlalchemy import DynamicTable, exc
 from snowflake.sqlalchemy.sql.custom_schema.options.as_query_option import AsQueryOption

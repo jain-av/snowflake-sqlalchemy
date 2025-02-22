@@ -8,12 +8,12 @@ from sqlalchemy import (
     Integer,
     MetaData,
     String,
-    select,
     text,
 )
 from sqlalchemy.exc import ArgumentError
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, Session
 from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy import select
 
 from snowflake.sqlalchemy import SnowflakeTable
 from snowflake.sqlalchemy.sql.custom_schema.options import (

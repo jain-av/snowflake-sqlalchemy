@@ -18,7 +18,7 @@ def test_simple_reflection_hybrid_table_as_table(
     """
 
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_table_sql)
+        connection.execute(create_table_sql)
 
     hybrid_test_table = Table(table_name, metadata, autoload_with=engine_testaccount)
 
@@ -54,7 +54,7 @@ def test_reflect_hybrid_table_with_index(
         """
 
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_table_sql)
+        connection.execute(create_table_sql)
 
     table = Table(table_name, metadata, schema=schema, autoload_with=engine_testaccount)
 

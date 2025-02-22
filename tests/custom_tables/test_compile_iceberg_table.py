@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import IcebergTable
 from snowflake.sqlalchemy.sql.custom_schema.options import (
