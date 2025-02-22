@@ -18,7 +18,7 @@ class InvalidTableOption(TableOption):
     def create(name: TableOptionKey, value: Exception) -> Optional[TableOption]:
         return InvalidTableOption(name, value)
 
-    def _render(self, compiler) -> str:
+    def _render(self, compiler, **kw) -> str:
         raise self.exception
 
     def __repr__(self) -> str:

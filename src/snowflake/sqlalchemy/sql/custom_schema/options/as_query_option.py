@@ -4,6 +4,7 @@
 from typing import Optional, Union
 
 from sqlalchemy.sql import Selectable
+from sqlalchemy.sql.compiler import Compiled
 
 from snowflake.sqlalchemy.custom_commands import NoneType
 
@@ -50,11 +51,16 @@ class AsQueryOption(TableOption):
 
     def __get_expression(self):
         if isinstance(self.query, Selectable):
-            return self.query.compile(compile_kwargs={"literal_binds": True})
+            return self.query.compile(
+                compile_kwargs={"literal_binds": True}
+            )  # type: Compiled
         return self.query
 
     def _render(self, compiler) -> str:
-        return self.template() % (self.__get_expression())
+        expression = self.__get_expression()
+        if isinstance(expression, Compiled):
+            return self.template() % expression.string
+        return self.template() % (expression)
 
     def __repr__(self) -> str:
         return "AsQueryOption(%s)" % self.__get_expression()

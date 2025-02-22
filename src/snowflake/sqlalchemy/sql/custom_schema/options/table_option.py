@@ -5,7 +5,6 @@ from enum import Enum
 from typing import List, Optional
 
 from snowflake.sqlalchemy import exc
-from snowflake.sqlalchemy.custom_commands import NoneType
 
 
 class Priority(Enum):
@@ -19,13 +18,12 @@ class Priority(Enum):
 
 
 class TableOption:
-
     def __init__(self) -> None:
         self._name: Optional[TableOptionKey] = None
 
     @property
-    def option_name(self) -> str:
-        if isinstance(self._name, NoneType):
+    def option_name(self) -> Optional[str]:
+        if self._name is None:
             return None
         return str(self._name.value)
 
@@ -54,7 +52,7 @@ class TableOption:
         )
 
     def _validate_option(self):
-        if isinstance(self.option_name, NoneType):
+        if self.option_name is None:
             raise exc.OptionKeyNotProvidedError(self.__class__.__name__)
 
     def template(self) -> str:
