@@ -138,7 +138,7 @@ def test_quoted_name_label(engine_testaccount):
 
     for t in test_cases:
         col = column("colname").label(t["label"])
-        sel_from_tbl = select(col).group_by(col).select_from(table("abc"))
+        sel_from_tbl = select(col).select_from(table("abc")).group_by(col)
         compiled_result = sel_from_tbl.compile()
         assert str(compiled_result) == t["output"]
 
@@ -146,7 +146,7 @@ def test_quoted_name_label(engine_testaccount):
 def test_outer_lateral_join():
     col = column("colname").label("label")
     col2 = column("colname2").label("label2")
-    lateral_table = func.flatten(func.PARSE_JSON(col2), outer=True).lateral()
+    lateral_table = func.flatten(func.parse_json(col2), outer=True).lateral()
     stmt = select(col).select_from(table("abc")).join(lateral_table).group_by(col)
     assert (
         str(stmt.compile(dialect=snowdialect.dialect()))

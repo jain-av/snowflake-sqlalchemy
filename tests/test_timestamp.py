@@ -32,7 +32,7 @@ def test_create_table_timestamp_datatypes(engine_testaccount):
     try:
         assert test_timestamp is not None
     finally:
-        test_timestamp.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
 
 
 def test_inspect_timestamp_datatypes(engine_testaccount):
@@ -69,15 +69,13 @@ def test_inspect_timestamp_datatypes(engine_testaccount):
         with engine_testaccount.connect() as conn:
             with conn.begin():
                 results = conn.execute(ins)
-                results.close()
 
                 s = select(test_timestamp)
                 results = conn.execute(s)
-                rows = results.fetchone()
-                results.close()
-                assert rows[0] == 1
-                assert rows[1] == current_utctime
-                assert rows[2] == current_localtime
-                assert rows[3] == current_localtime_with_other_tz
+                row = results.fetchone()
+                assert row[0] == 1
+                assert row[1] == current_utctime
+                assert row[2] == current_localtime
+                assert row[3] == current_localtime_with_other_tz
     finally:
-        test_timestamp.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)

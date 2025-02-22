@@ -205,7 +205,7 @@ def test_simple_sql(engine_testaccount):
     """
     with engine_testaccount.connect() as conn:
         result = conn.execute(text("show databases"))
-    rows = [row for row in result]
+    rows = [row for row in result.scalars()]
     assert len(rows) >= 0, "show database results"
 
 
@@ -222,15 +222,14 @@ def test_create_drop_tables(engine_testaccount):
         # validate the tables exists
         with engine_testaccount.connect() as conn:
             results = conn.execute(text("desc table users"))
-            assert len([row for row in results]) > 0, "users table doesn't exist"
+            assert len([row for row in results.scalars()]) > 0, "users table doesn't exist"
 
             # validate the tables exists
             results = conn.execute(text("desc table addresses"))
-            assert len([row for row in results]) > 0, "addresses table doesn't exist"
+            assert len([row for row in results.scalars()]) > 0, "addresses table doesn't exist"
     finally:
         # drop tables
-        addresses.drop(engine_testaccount)
-        users.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
 
 
 def test_insert_tables(engine_testaccount):
@@ -245,39 +244,36 @@ def test_insert_tables(engine_testaccount):
             with conn.begin():
                 # inserts data with an implicitly generated id
                 results = conn.execute(
-                    users.insert().values(name="jack", fullname="Jack Jones")
+                    insert(users).values(name="jack", fullname="Jack Jones")
                 )
                 # Note: SQLAlchemy 1.4 changed what ``inserted_primary_key`` returns
                 #  a cast is here to make sure the test works with both older and newer
                 #  versions
                 assert list(results.inserted_primary_key) == [1], "sequence value"
-                results.close()
 
                 # inserts data with the given id
                 conn.execute(
-                    users.insert(),
-                    {"id": 2, "name": "wendy", "fullname": "Wendy Williams"},
+                    insert(users),
+                    [{"id": 2, "name": "wendy", "fullname": "Wendy Williams"}],
                 )
 
                 # verify the results
                 results = conn.execute(select(users))
                 assert (
-                    len([row for row in results]) == 2
+                    len([row for row in results.scalars()]) == 2
                 ), "number of rows from users table"
-                results.close()
 
                 # fetchone
                 results = conn.execute(select(users).order_by("id"))
                 row = results.fetchone()
-                results.close()
-                assert row._mapping._data[2] == "Jack Jones", "user name"
+                assert row[2] == "Jack Jones", "user name"
                 assert row._mapping["fullname"] == "Jack Jones", "user name by dict"
                 assert (
                     row._mapping[users.c.fullname] == "Jack Jones"
                 ), "user name by Column object"
 
                 conn.execute(
-                    addresses.insert(),
+                    insert(addresses),
                     [
                         {"user_id": 1, "email_address": "jack@yahoo.com"},
                         {"user_id": 1, "email_address": "jack@msn.com"},
@@ -289,9 +285,8 @@ def test_insert_tables(engine_testaccount):
                 # more records
                 results = conn.execute(select(addresses))
                 assert (
-                    len([row for row in results]) == 4
+                    len([row for row in results.scalars()]) == 4
                 ), "number of rows from addresses table"
-                results.close()
 
                 # select specified column names
                 results = conn.execute(
@@ -310,6 +305,8 @@ def test_insert_tables(engine_testaccount):
                 results.fetchone()
                 row = results.fetchone()
                 assert row._mapping["email_address"] == "wendy@aol.com", "email address"
+        finally:
+            metadata.drop_all(engine_testaccount)
 
                 # Operator
                 assert (
@@ -441,7 +438,7 @@ def test_reflextion(engine_testaccount):
     Tests Reflection
     """
     with engine_testaccount.connect() as conn:
-        engine_testaccount.execute(
+        conn.execute(
             textwrap.dedent(
                 """\
             CREATE OR REPLACE TABLE user (
@@ -457,7 +454,7 @@ def test_reflextion(engine_testaccount):
             user_reflected = Table("user", meta, autoload_with=engine_testaccount)
             assert user_reflected.c == ["user.id", "user.name", "user.fullname"]
         finally:
-            conn.execute("DROP TABLE IF EXISTS user")
+            conn.execute(text("DROP TABLE IF EXISTS user"))
 
 
 def test_inspect_column(engine_testaccount):
@@ -622,7 +619,7 @@ def test_naming_convention_constraint_names(engine_testaccount):
         "addresses",
         metadata,
         Column("id", Integer, primary_key=True),
-        Column("user_id", None, ForeignKey(users.c.id)),
+        Column("user_id", ForeignKey(users.c.id)),
         Column("email_address", String, nullable=False, unique=True),
     )
     metadata.create_all(engine_testaccount)
@@ -764,7 +761,7 @@ def test_view_definition(engine_testaccount, db_parameters):
             inspector = inspect(engine_testaccount)
             assert inspector.get_view_definition(test_view_name) == sql.strip()
             assert (
-                inspector.get_view_definition(test_view_name, db_parameters["schema"])
+                inspector.get_view_definition(test_view_name, schema=db_parameters["schema"])
                 == sql.strip()
             )
             assert inspector.get_view_names() == [test_view_name]
@@ -822,7 +819,7 @@ def test_get_temp_table_names(engine_testaccount):
                 f"CREATE TEMPORARY TABLE {temp_table_name + str(idx)} (col1 integer, col2 string)"
             ).execution_options(autocommit=True)
         )
-    for row in engine_testaccount.execute("SHOW TABLES"):
+    for row in engine_testaccount.execute(text("SHOW TABLES")):
         print(row)
     inspector = inspect(engine_testaccount)
     temp_table_names = inspector.get_temp_table_names()
@@ -852,7 +849,6 @@ def test_create_table_with_schema(engine_testaccount, db_parameters):
             metadata.drop_all(engine_testaccount)
             conn.execute(text(f'DROP SCHEMA IF EXISTS "{new_schema}"'))
 
-
 @pytest.mark.skipif(
     os.getenv("SNOWFLAKE_GCP") is not None,
     reason="PUT and GET is not supported for GCP yet",
@@ -868,15 +864,16 @@ def test_copy(engine_testaccount):
         )
 
         try:
-            with conn.begin():
-                conn.execute(
-                    text(
-                        f"PUT file://{os.path.join(THIS_DIR, 'data', 'users.txt')} @%users"
-                    )
+            trans = conn.begin()
+            conn.execute(
+                text(
+                    f"PUT file://{os.path.join(THIS_DIR, 'data', 'users.txt')} @%users"
                 )
-                conn.execute(text("COPY INTO users"))
-                results = conn.execute(text("SELECT * FROM USERS")).fetchall()
-                assert results is not None and len(results) > 0
+            )
+            conn.execute(text("COPY INTO users"))
+            results = conn.execute(text("SELECT * FROM USERS")).fetchall()
+            assert results is not None and len(results) > 0
+            trans.commit()
         finally:
             addresses.drop(engine_testaccount)
             users.drop(engine_testaccount)
@@ -894,24 +891,23 @@ def test_transaction(engine_testaccount, db_parameters):
     engine_testaccount.execute(
         text(f"CREATE TABLE {db_parameters['name']} (c1 number)")
     )
-    trans = engine_testaccount.connect().begin()
-    try:
-        engine_testaccount.execute(
-            text(f"INSERT INTO {db_parameters['name']} VALUES(123)")
-        )
-        trans.commit()
-        engine_testaccount.execute(
-            text(f"INSERT INTO {db_parameters['name']} VALUES(456)")
-        )
-        trans.rollback()
-        results = engine_testaccount.execute(
-            f"SELECT * FROM {db_parameters['name']}"
-        ).fetchall()
-        assert results == [(123,)]
-    finally:
-        engine_testaccount.execute(
-            text(f"DROP TABLE IF EXISTS {db_parameters['name']}")
-        )
+    with engine_testaccount.connect() as conn:
+        trans = conn.begin()
+        try:
+            conn.execute(
+                text(f"INSERT INTO {db_parameters['name']} VALUES(123)")
+            )
+            trans.commit()
+            conn.execute(
+                text(f"INSERT INTO {db_parameters['name']} VALUES(456)")
+            )
+            trans.rollback()
+            results = conn.execute(text(f"SELECT * FROM {db_parameters['name']}")).fetchall()
+            assert results == [(123,)]
+        finally:
+            conn.execute(
+                text(f"DROP TABLE IF EXISTS {db_parameters['name']}")
+            )
 
 
 def test_get_schemas(engine_testaccount):
@@ -983,7 +979,6 @@ def test_many_table_column_metadta(db_parameters):
             ),
             Column(
                 "user_id" + str(idx),
-                None,
                 ForeignKey("mainusers" + str(idx) + ".id" + str(idx)),
             ),
             Column("email_address" + str(idx), String, nullable=False),
@@ -1050,7 +1045,6 @@ def test_cache_time(engine_testaccount, db_parameters):
             ),
             Column(
                 "user_id" + str(idx),
-                None,
                 ForeignKey("mainusers" + str(idx) + ".id" + str(idx)),
             ),
             Column("email_address" + str(idx), String, nullable=False),
@@ -1122,7 +1116,6 @@ def test_load_dialect():
     """
     assert isinstance(dialects.registry.load("snowflake")(), dialect)
 
-
 @pytest.mark.parametrize("conditional_flag", [True, False])
 @pytest.mark.parametrize(
     "update_flag,insert_flag,delete_flag",
@@ -1158,7 +1151,7 @@ def test_upsert(
         with engine_testaccount.connect() as conn:
             with conn.begin():
                 conn.execute(
-                    users.insert(),
+                    insert(users),
                     [
                         {"id": 1, "name": "mark", "fullname": "Mark Keller"},
                         {"id": 4, "name": "luke", "fullname": "Luke Lorimer"},
@@ -1166,7 +1159,7 @@ def test_upsert(
                     ],
                 )
                 conn.execute(
-                    onboarding_users.insert(),
+                    insert(onboarding_users),
                     [
                         {
                             "id": 2,
@@ -1213,9 +1206,13 @@ def test_upsert(
                     if conditional_flag:
                         clause.where(onboarding_users.c.delete == True)  # NOQA
                 conn.execute(merge)
-                users_tuples = {tuple(row) for row in conn.execute(select(users))}
+                users_tuples = {
+                    tuple(row)
+                    for row in conn.execute(select(users)).mappings().all()
+                }
                 onboarding_users_tuples = {
-                    tuple(row) for row in conn.execute(select(onboarding_users))
+                    tuple(row)
+                    for row in conn.execute(select(onboarding_users)).mappings().all()
                 }
                 expected_users = {
                     (1, "mark", "Mark Keller"),
@@ -1242,8 +1239,23 @@ def test_upsert(
                     (4, "lukas", "Lukas Lorimer", False),
                     (5, "andras", None, False),
                 }
-                assert users_tuples == expected_users
-                assert onboarding_users_tuples == expected_onboarding_users
+                assert users_tuples == {
+                    (
+                        row["id"],
+                        row["name"],
+                        row["fullname"],
+                    )
+                    for row in expected_users
+                }
+                assert onboarding_users_tuples == {
+                    (
+                        row["id"],
+                        row["name"],
+                        row["fullname"],
+                        row["delete"],
+                    )
+                    for row in expected_onboarding_users
+                }
     finally:
         users.drop(engine_testaccount)
         onboarding_users.drop(engine_testaccount)
@@ -1278,7 +1290,7 @@ def test_deterministic_merge_into(sql_compiler):
         onboarding_users.c.fullname != None  # NOQA
     )
     assert (
-        sql_compiler(merge)
+        str(merge.compile(dialect=sql_compiler.dialect))
         == "MERGE INTO users USING onboarding_users ON users.id = onboarding_users.id "
         "WHEN MATCHED THEN UPDATE SET fullname = onboarding_users.fullname, "
         "name = onboarding_users.name WHEN NOT MATCHED AND onboarding_users.fullname "
@@ -1368,7 +1380,6 @@ def test_comment_sqlalchemy(db_parameters, engine_testaccount, on_public_ci):
             con2.close()
         engine2.dispose()
 
-
 @pytest.mark.internal
 def test_special_schema_character(db_parameters, on_public_ci):
     """Make sure we decode special characters correctly"""
@@ -1392,7 +1403,7 @@ def test_special_schema_character(db_parameters, on_public_ci):
     with create_engine(URL(**options)).connect() as sa_conn:
         sa_connection = sa_conn.execute(
             text("select current_database(), " "current_schema();")
-        ).fetchall()
+        ).scalars().all()
     # Teardown
     with connect(**options) as conn:
         conn.cursor().execute(f'DROP DATABASE IF EXISTS "{database}"')
@@ -1418,15 +1429,15 @@ def test_autoincrement(engine_testaccount):
         metadata.create_all(engine_testaccount)
 
         with engine_testaccount.begin() as connection:
-            connection.execute(insert(users), [{"name": "sf1"}])
+            connection.execute(insert(users).values({"name": "sf1"}))
             assert connection.execute(select(users)).fetchall() == [(1, "sf1")]
-            connection.execute(insert(users), [{"name": "sf2"}, {"name": "sf3"}])
+            connection.execute(insert(users).values([{"name": "sf2"}, {"name": "sf3"}]))
             assert connection.execute(select(users)).fetchall() == [
                 (1, "sf1"),
                 (2, "sf2"),
                 (3, "sf3"),
             ]
-            connection.execute(insert(users), {"name": "sf4"})
+            connection.execute(insert(users).values({"name": "sf4"}))
             assert connection.execute(select(users)).fetchall() == [
                 (1, "sf1"),
                 (2, "sf2"),
@@ -1435,8 +1446,8 @@ def test_autoincrement(engine_testaccount):
             ]
 
             seq = Sequence("id_seq")
-            nextid = connection.execute(seq)
-            connection.execute(insert(users), [{"uid": nextid, "name": "sf5"}])
+            nextid = connection.execute(seq.next_value())
+            connection.execute(insert(users).values([{"uid": nextid, "name": "sf5"}]))
             assert connection.execute(select(users)).fetchall() == [
                 (1, "sf1"),
                 (2, "sf2"),
@@ -1636,7 +1647,7 @@ CREATE TEMP TABLE {table_name} (
 def test_result_type_and_value(engine_testaccount):
     with engine_testaccount.connect() as conn:
         table_name = random_string(5)
-        conn.exec_driver_sql(
+        conn.execute(text(
             f"""\
 CREATE TEMP TABLE {table_name} (
     C1 BIGINT, C2 BINARY, C3 BOOLEAN, C4 CHAR, C5 CHARACTER, C6 DATE, C7 DATETIME, C8 DEC(12,3),
@@ -1646,7 +1657,7 @@ CREATE TEMP TABLE {table_name} (
     C32 GEOMETRY
 )
 """
-        )
+        ))
         table_reflected = Table(table_name, MetaData(), autoload_with=conn)
         current_date = date.today()
         current_utctime = datetime.utcnow()
@@ -1670,7 +1681,7 @@ CREATE TEMP TABLE {table_name} (
         GEOMETRY_VALUE = "POINT(-94.58473 39.08985)"
         GEOMETRY_RESULT_VALUE = '{"coordinates": [-94.58473,39.08985],"type": "Point"}'
 
-        ins = table_reflected.insert().values(
+        ins = insert(table_reflected).values(
             c1=MAX_INT_VALUE,  # BIGINT
             c2=BINARY_VALUE,  # BINARY
             c3=True,  # BOOLEAN
@@ -1753,7 +1764,7 @@ SELECT PARSE_JSON('{{"vk1":100, "vk2":200, "vk3":300}}'),
 {{"k":2, "v":"str2"}},
 {{"k":3, "v":"str3"}}]'
 )"""
-        conn.exec_driver_sql(sql)
+        conn.execute(text(sql))
         results = conn.execute(select(table_reflected)).fetchall()
         assert len(results) == 2
         data = json.loads(results[-1][27])
@@ -1768,22 +1779,22 @@ SELECT PARSE_JSON('{{"vk1":100, "vk2":200, "vk3":300}}'),
 def test_normalize_and_denormalize_empty_string_column_name(engine_testaccount):
     with engine_testaccount.connect() as conn:
         table_name = random_string(5)
-        conn.exec_driver_sql(
+        conn.execute(text(
             f"""
 CREATE OR REPLACE TEMP TABLE {table_name}
 (EMPID INT, DEPT TEXT, JAN INT, FEB INT)
 """
-        )
-        conn.exec_driver_sql(
+        ))
+        conn.execute(text(
             f"""
 INSERT INTO {table_name} VALUES
     (1, 'ELECTRONICS', 100, 200),
     (2, 'CLOTHES', 100, 300)
 """
-        )
-        results = conn.exec_driver_sql(
+        ))
+        results = conn.execute(text(
             f'SELECT * FROM {table_name} UNPIVOT(SALES FOR "" IN (JAN, FEB)) ORDER BY EMPID;'
-        ).fetchall()  # normalize_name will be called
+        )).fetchall()  # normalize_name will be called
         assert results == [
             (1, "ELECTRONICS", "JAN", 100),
             (1, "ELECTRONICS", "FEB", 200),
@@ -1791,12 +1802,12 @@ INSERT INTO {table_name} VALUES
             (2, "CLOTHES", "FEB", 300),
         ]
 
-        conn.exec_driver_sql(
+        conn.execute(text(
             f"""
 CREATE OR REPLACE TEMP TABLE {table_name}
 (COL INT, "" INT)
 """
-        )
+        ))
         inspector = inspect(conn)
         columns = inspector.get_columns(table_name)  # denormalize_name will be called
         assert (
@@ -1813,11 +1824,11 @@ def test_snowflake_sqlalchemy_as_valid_client_type():
     )
     with engine.connect() as conn:
         with pytest.raises(snowflake.connector.errors.NotSupportedError):
-            conn.exec_driver_sql("select 1").cursor.fetch_pandas_all()
+            conn.execute(text("select 1")).cursor.fetch_pandas_all()
 
     engine = create_engine(URL(**CONNECTION_PARAMETERS))
     with engine.connect() as conn:
-        conn.exec_driver_sql("select 1").cursor.fetch_pandas_all()
+        conn.execute(text("select 1")).cursor.fetch_pandas_all()
 
     try:
         snowflake.sqlalchemy.snowdialect._ENABLE_SQLALCHEMY_AS_APPLICATION_NAME = False
@@ -1848,7 +1859,7 @@ def test_snowflake_sqlalchemy_as_valid_client_type():
         )
         engine = create_engine(URL(**CONNECTION_PARAMETERS))
         with engine.connect() as conn:
-            conn.exec_driver_sql("select 1").cursor.fetch_pandas_all()
+            conn.execute(text("select 1")).cursor.fetch_pandas_all()
             assert (
                 conn.connection.driver_connection._internal_application_name
                 == "PythonConnector"
@@ -1866,6 +1877,13 @@ def test_snowflake_sqlalchemy_as_valid_client_type():
         snowflake.connector.connection.DEFAULT_CONFIGURATION[
             "internal_application_version"
         ] = origin_internal_app_version
+
+import decimal
+import pytest
+from sqlalchemy import literal, func, select
+from sqlalchemy.testing.assertions import eq_
+
+from snowflake.sqlalchemy import URL, create_engine
 
 
 @pytest.mark.parametrize(
@@ -1889,10 +1907,12 @@ def test_true_division_operation(engine_testaccount, operation):
     # expected_warning = "div_is_floordiv value will be changed to False in a future release. This will generate a behavior change on true and floor division. Please review https://docs.sqlalchemy.org/en/20/changelog/whatsnew_20.html#python-division-operator-performs-true-division-for-all-backends-added-floor-division"
     # with pytest.warns(PendingDeprecationWarning, match=expected_warning):
     with engine_testaccount.connect() as conn:
+        result = conn.execute(select(operation[0] / operation[1]))
         eq_(
-            conn.execute(select(operation[0] / operation[1])).fetchall(),
+            result.fetchall(),
             [((operation[2]),)],
         )
+        result.close()
 
 
 @pytest.mark.parametrize(
@@ -1918,12 +1938,14 @@ def test_division_force_div_is_floordiv_default(engine_testaccount, operation):
     expected_warning = "div_is_floordiv value will be changed to False in a future release. This will generate a behavior change on true and floor division. Please review https://docs.sqlalchemy.org/en/20/changelog/whatsnew_20.html#python-division-operator-performs-true-division-for-all-backends-added-floor-division"
     with pytest.warns(PendingDeprecationWarning, match=expected_warning):
         with engine_testaccount.connect() as conn:
+            result = conn.execute(
+                select(operation[0] / operation[1], operation[0] // operation[1])
+            )
             eq_(
-                conn.execute(
-                    select(operation[0] / operation[1], operation[0] // operation[1])
-                ).fetchall(),
+                result.fetchall(),
                 [(operation[2], operation[3])],
             )
+            result.close()
 
 
 @pytest.mark.parametrize(
@@ -1943,9 +1965,11 @@ def test_division_force_div_is_floordiv_default(engine_testaccount, operation):
 def test_division_force_div_is_floordiv_false(db_parameters, operation):
     engine = create_engine(URL(**db_parameters), **{"force_div_is_floordiv": False})
     with engine.connect() as conn:
+        result = conn.execute(
+            select(operation[0] / operation[1], operation[0] // operation[1])
+        )
         eq_(
-            conn.execute(
-                select(operation[0] / operation[1], operation[0] // operation[1])
-            ).fetchall(),
+            result.fetchall(),
             [(operation[2], operation[3])],
         )
+        result.close()

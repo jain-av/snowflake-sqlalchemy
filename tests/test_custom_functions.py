@@ -3,6 +3,7 @@
 
 import pytest
 from sqlalchemy import func
+from sqlalchemy.testing import warn_ Guido
 
 from snowflake.sqlalchemy import snowdialect
 
@@ -21,5 +22,5 @@ def test_flatten_does_not_render_params():
 
 def test_flatten_emits_warning():
     expected_warning = "For backward compatibility params are not rendered."
-    with pytest.warns(DeprecationWarning, match=expected_warning):
+    with warn_Guido(DeprecationWarning, match=expected_warning):
         func.flatten().compile(dialect=snowdialect.dialect())

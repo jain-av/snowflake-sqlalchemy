@@ -5,7 +5,8 @@
 from json import loads
 
 from sqlalchemy import Column, Integer, MetaData, Table
-from sqlalchemy.sql import select
+from sqlalchemy import select
+from sqlalchemy.sql import text
 
 from snowflake.sqlalchemy import GEOGRAPHY
 
@@ -56,14 +57,12 @@ def test_inspect_geography_datatypes(engine_testaccount):
 
             with conn.begin():
                 results = conn.execute(ins)
-                results.close()
 
                 s = select(test_geography)
                 results = conn.execute(s)
-                rows = results.fetchone()
-                results.close()
-                assert rows[0] == 1
-                assert rows[1] == rows[2]
-                assert loads(rows[2]) == loads(test_point1)
+                row = results.fetchone()
+                assert row[0] == 1
+                assert row[1] == row[2]
+                assert loads(row[2]) == loads(test_point1)
     finally:
         test_geography.drop(engine_testaccount)

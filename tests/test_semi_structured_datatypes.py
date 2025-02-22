@@ -30,7 +30,7 @@ def test_create_table_semi_structured_datatypes(engine_testaccount):
     try:
         assert test_variant is not None
     finally:
-        test_variant.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
 
 
 @pytest.mark.skip(
@@ -55,10 +55,11 @@ def test_insert_semi_structured_datatypes(engine_testaccount):
     metadata.create_all(engine_testaccount)
     try:
         ins = test_variant.insert().values(id=1, va='{"vk1":100, "vk2":200, "vk3":300}')
-        results = engine_testaccount.execute(ins)
-        results.close()
+        with engine_testaccount.connect() as connection:
+            results = connection.execute(ins)
+            connection.commit()
     finally:
-        test_variant.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
 
 
 def test_inspect_semi_structured_datatypes(engine_testaccount):
@@ -77,35 +78,34 @@ def test_inspect_semi_structured_datatypes(engine_testaccount):
     metadata.create_all(engine_testaccount)
     try:
         with engine_testaccount.connect() as conn:
-            with conn.begin():
-                sql = textwrap.dedent(
-                    f"""
-                    INSERT INTO {table_name}(id, va, ar)
-                    SELECT 1,
-                           PARSE_JSON('{{"vk1":100, "vk2":200, "vk3":300}}'),
-                           PARSE_JSON('[
-                    {{"k":1, "v":"str1"}},
-                    {{"k":2, "v":"str2"}},
-                    {{"k":3, "v":"str3"}}]'
-                    )
-                    """
+            sql = textwrap.dedent(
+                f"""
+                INSERT INTO {table_name}(id, va, ar)
+                SELECT 1,
+                       PARSE_JSON('{{"vk1":100, "vk2":200, "vk3":300}}'),
+                       PARSE_JSON('[
+                {{"k":1, "v":"str1"}},
+                {{"k":2, "v":"str2"}},
+                {{"k":3, "v":"str3"}}]'
                 )
-                conn.exec_driver_sql(sql)
-                inspecter = inspect(engine_testaccount)
-                columns = inspecter.get_columns(table_name)
-                assert isinstance(columns[1]["type"], VARIANT)
-                assert isinstance(columns[2]["type"], ARRAY)
+                """
+            )
+            conn.exec_driver_sql(sql)
+            conn.commit()
+            inspecter = inspect(engine_testaccount)
+            columns = inspecter.get_columns(table_name)
+            assert isinstance(columns[1]["type"], VARIANT)
+            assert isinstance(columns[2]["type"], ARRAY)
 
-                s = select(test_variant)
-                results = conn.execute(s)
-                rows = results.fetchone()
-                results.close()
-                assert rows[0] == 1
-                data = json.loads(rows[1])
-                assert data["vk1"] == 100
-                assert data["vk3"] == 300
-                assert data is not None
-                data = json.loads(rows[2])
-                assert data[1]["k"] == 2
+            s = select(test_variant)
+            result = conn.execute(s)
+            rows = result.fetchone()
+            assert rows[0] == 1
+            data = json.loads(rows[1])
+            assert data["vk1"] == 100
+            assert data["vk3"] == 300
+            assert data is not None
+            data = json.loads(rows[2])
+            assert data[1]["k"] == 2
     finally:
-        test_variant.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)

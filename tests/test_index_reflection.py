@@ -3,7 +3,7 @@
 #
 import pytest
 from sqlalchemy import MetaData, inspect
-from sqlalchemy.sql.ddl import CreateSchema, DropSchema
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 
 @pytest.mark.aws
@@ -30,9 +30,9 @@ def test_indexes_reflection(engine_testaccount, db_parameters, sql_compiler):
     insp = inspect(engine_testaccount)
 
     try:
-        with engine_testaccount.connect():
+        with engine_testaccount.connect() as connection:
             # Prefixes reflection not supported, example: "HYBRID, DYNAMIC"
-            indexes = insp.get_indexes(table_name, schema)
+            indexes = insp.get_indexes(table_name, schema=schema)
             assert len(indexes) == 1
             assert indexes[0].get("name") == index_name
             assert indexes[0].get("column_names") == index_columns

@@ -3,6 +3,7 @@
 #
 
 from sqlalchemy import Column, Integer, MetaData, String, select, text
+from sqlalchemy.orm import Session
 
 from snowflake.sqlalchemy import SnowflakeTable
 
@@ -60,15 +61,16 @@ def test_begin_read_commited(engine_testaccount, assert_text_in_buf):
     try:
         with engine_testaccount.connect().execution_options(
             isolation_level="READ COMMITTED"
-        ) as connection, connection.begin():
-            result = connection.execute(CURRENT_TRANSACTION).fetchall()
-            assert result[0] == (None,), result
-            ins = test_table_1.insert().values(id=1, name="test")
-            connection.execute(ins)
-            result = connection.execute(CURRENT_TRANSACTION).fetchall()
-            assert result[0] != (
-                None,
-            ), "AUTOCOMMIT DISABLED, transaction should be started"
+        ) as connection:
+            with connection.begin():
+                result = connection.execute(CURRENT_TRANSACTION).fetchall()
+                assert result[0] == (None,), result
+                ins = test_table_1.insert().values(id=1, name="test")
+                connection.execute(ins)
+                result = connection.execute(CURRENT_TRANSACTION).fetchall()
+                assert result[0] != (
+                    None,
+                ), "AUTOCOMMIT DISABLED, transaction should be started"
 
         with engine_testaccount.connect() as conn:
             s = select(test_table_1)
@@ -134,15 +136,16 @@ def test_begin_autocommit(engine_testaccount, assert_text_in_buf):
     try:
         with engine_testaccount.connect().execution_options(
             isolation_level="AUTOCOMMIT"
-        ) as connection, connection.begin():
-            result = connection.execute(CURRENT_TRANSACTION).fetchall()
-            assert result[0] == (None,), result
-            ins = test_table_1.insert().values(id=1, name="test")
-            connection.execute(ins)
-            result = connection.execute(CURRENT_TRANSACTION).fetchall()
-            assert result[0] == (
-                None,
-            ), "Autocommit enabled, transaction should not be started"
+        ) as connection:
+            with connection.begin():
+                result = connection.execute(CURRENT_TRANSACTION).fetchall()
+                assert result[0] == (None,), result
+                ins = test_table_1.insert().values(id=1, name="test")
+                connection.execute(ins)
+                result = connection.execute(CURRENT_TRANSACTION).fetchall()
+                assert result[0] == (
+                    None,
+                ), "Autocommit enabled, transaction should not be started"
 
         with engine_testaccount.connect() as conn:
             s = select(test_table_1)

@@ -2,22 +2,21 @@
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 #
 import pytest
+from sqlalchemy import Column, Integer, String, Identity
 
-from snowflake.sqlalchemy import NUMBER
+from snowflake.sqlalchemy import types as snow_types
 from snowflake.sqlalchemy.custom_types import MAP, TEXT
-from src.snowflake.sqlalchemy.parser.custom_type_parser import (
-    parse_type,
-    tokenize_parameters,
-)
 
 
 def test_compile_map_with_not_null(snapshot):
-    user_table = MAP(NUMBER(10, 0), TEXT(), not_null=True)
-    assert user_table.compile() == snapshot
+    user_table = MAP(snow_types.NUMBER(10, 0), TEXT(), not_null=True)
+    assert str(user_table.compile()) == snapshot
 
 
 def test_extract_parameters():
     example = "a, b(c, d, f), d"
+    from src.snowflake.sqlalchemy.parser.custom_type_parser import tokenize_parameters
+
     assert tokenize_parameters(example) == ["a", "b(c, d, f)", "d"]
 
 
@@ -78,4 +77,6 @@ def test_extract_parameters():
     ],
 )
 def test_snowflake_data_types(input_type, expected_type):
-    assert parse_type(input_type).compile() == expected_type
+    from src.snowflake.sqlalchemy.parser.custom_type_parser import parse_type
+
+    assert str(parse_type(input_type).compile()) == expected_type

@@ -52,14 +52,13 @@ def test_inspect_geometry_datatypes(engine_testaccount):
                 id=1, geom1=test_point, geom2=test_point1
             )
 
-            with conn.begin():
-                results = conn.execute(ins)
-                results.close()
+            with conn.begin() as trans:
+                result = conn.execute(ins)
+                trans.commit()
 
                 s = select(test_geometry)
-                results = conn.execute(s)
-                rows = results.fetchone()
-                results.close()
+                result = conn.execute(s)
+                rows = result.fetchone()
                 assert rows[0] == 1
                 assert rows[1] == rows[2]
                 assert loads(rows[2]) == loads(test_point1)

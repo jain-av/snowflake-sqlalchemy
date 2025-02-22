@@ -10,6 +10,7 @@ from snowflake.sqlalchemy import (
     ExternalStage,
     PARQUETFormatter,
 )
+from sqlalchemy import text
 
 
 def test_create_stage(sql_compiler):

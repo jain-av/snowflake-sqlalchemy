@@ -14,7 +14,7 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy.sql import text
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 
 def test_table_with_sequence(engine_testaccount, db_parameters):
@@ -43,7 +43,7 @@ def test_table_with_sequence(engine_testaccount, db_parameters):
         metadata.create_all(engine_testaccount)
 
         with engine_testaccount.begin() as conn:
-            conn.execute(insert(sequence_table), ({"data": "test_insert_1"}))
+            conn.execute(insert(sequence_table).values({"data": "test_insert_1"}))
             result = conn.execute(select(sequence_table)).fetchall()
             assert result == [(1, "test_insert_1")], result
 
@@ -55,21 +55,24 @@ def test_table_with_sequence(engine_testaccount, db_parameters):
             seq = Sequence(test_sequence_name, order=True)
 
             conn.execute(
-                insert(autoload_sequence_table),
-                (
-                    {"data": "multi_insert_1"},
-                    {"data": "multi_insert_2"},
+                insert(autoload_sequence_table).values(
+                    [
+                        {"data": "multi_insert_1"},
+                        {"data": "multi_insert_2"},
+                    ]
                 ),
             )
             conn.execute(
-                insert(autoload_sequence_table),
-                ({"data": "test_insert_2"},),
+                insert(autoload_sequence_table).values(
+                    [{"data": "test_insert_2"}],
+                ),
             )
 
-            nextid = conn.execute(seq)
+            nextid = conn.execute(seq.next_value())
             conn.execute(
-                insert(autoload_sequence_table),
-                ({"id": nextid, "data": "test_insert_seq"}),
+                insert(autoload_sequence_table).values(
+                    ({"id": nextid, "data": "test_insert_seq"}),
+                ),
             )
 
             result = conn.execute(select(sequence_table)).fetchall()
@@ -109,7 +112,7 @@ def test_table_with_autoincrement(engine_testaccount):
             conn.execute(text("ALTER SESSION SET NOORDER_SEQUENCE_AS_DEFAULT = FALSE"))
             metadata.create_all(conn)
 
-            conn.execute(insert(autoincrement_table), ({"data": "test_insert_1"}))
+            conn.execute(insert(autoincrement_table).values({"data": "test_insert_1"}))
             result = conn.execute(select_stmt).fetchall()
             assert result == [(1, "test_insert_1")]
 
@@ -117,15 +120,17 @@ def test_table_with_autoincrement(engine_testaccount):
                 test_table_name, MetaData(), autoload_with=engine_testaccount
             )
             conn.execute(
-                insert(autoload_sequence_table),
-                [
-                    {"data": "multi_insert_1"},
-                    {"data": "multi_insert_2"},
-                ],
+                insert(autoload_sequence_table).values(
+                    [
+                        {"data": "multi_insert_1"},
+                        {"data": "multi_insert_2"},
+                    ]
+                ),
             )
             conn.execute(
-                insert(autoload_sequence_table),
-                [{"data": "test_insert_2"}],
+                insert(autoload_sequence_table).values(
+                    [{"data": "test_insert_2"}],
+                ),
             )
             result = conn.execute(select_stmt).fetchall()
             assert result == [
@@ -152,7 +157,7 @@ def test_table_with_identity(sql_compiler):
         Column("identity_col", Integer, Identity()),
     )
     create_table = CreateTable(identity_autoincrement_table)
-    actual = sql_compiler(create_table)
+    actual = sql_compiler(create_table.compile())
     expected = (
         "CREATE TABLE identity ("
         "\tid INTEGER NOT NULL IDENTITY(1,1) ORDER, "

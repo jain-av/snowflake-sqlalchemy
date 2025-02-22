@@ -271,7 +271,6 @@ def test_copy_into_storage_csv_extended(sql_compiler):
     )
     assert result == expected
 
-
 def test_copy_into_storage_parquet_named_format(sql_compiler):
     """
     This test compiles the SQL to read Parquet data from a stage and insert it into a
@@ -366,13 +365,11 @@ def test_copy_into_storage_parquet_files(sql_compiler):
     )
 
     # setup CopyInto object
-    copy_into = (
-        CopyIntoStorage(
-            from_=sel_statement,
-            into=target_table,
-        )
-        .force(True)
-        .files(["foo.txt", "bar.txt"])
+    copy_into = CopyIntoStorage(
+        from_=sel_statement,
+        into=target_table,
+        force=True,
+        files=["foo.txt", "bar.txt"],
     )
 
     # compile and check the result
@@ -428,13 +425,11 @@ def test_copy_into_storage_parquet_pattern(sql_compiler):
     )
 
     # setup CopyInto object
-    copy_into = (
-        CopyIntoStorage(
-            from_=sel_statement,
-            into=target_table,
-        )
-        .force(True)
-        .pattern("'.*csv'")
+    copy_into = CopyIntoStorage(
+        from_=sel_statement,
+        into=target_table,
+        force=True,
+        pattern="'.*csv'",
     )
 
     # compile and check the result

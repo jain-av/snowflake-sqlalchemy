@@ -4,6 +4,7 @@
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table, insert, select
+from sqlalchemy.orm import Session
 
 
 @pytest.mark.parametrize(
@@ -27,8 +28,8 @@ def test_insert_with_identifier_as_column_name(identifier: str, engine_testaccou
     try:
         metadata.create_all(engine_testaccount)
 
-        with engine_testaccount.connect() as connection:
-            connection.execute(
+        with Session(engine_testaccount) as session:
+            session.execute(
                 insert(table).values(
                     {
                         "ca": 1,
@@ -37,7 +38,8 @@ def test_insert_with_identifier_as_column_name(identifier: str, engine_testaccou
                     }
                 )
             )
-            result = connection.execute(select(table)).fetchall()
+            session.commit()
+            result = session.execute(select(table)).fetchall()
             assert result == [(1, "test", expected_identifier)]
     finally:
         metadata.drop_all(engine_testaccount)

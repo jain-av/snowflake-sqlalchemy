@@ -3,20 +3,28 @@
 #
 
 from sqlalchemy import Integer, Sequence, String
-from sqlalchemy.schema import Column, MetaData, Table
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.schema import MetaData
 from sqlalchemy.sql import select
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.ext.declarative import declarative_base
+
+
+Base = declarative_base()
+
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, Sequence("user_id_seq"), primary_key=True)
+    name: Mapped[str] = mapped_column(String)
+    fullname: Mapped[str] = mapped_column(String)
 
 
 def test_insert_table(engine_testaccount):
     metadata = MetaData()
-    users = Table(
-        "users",
-        metadata,
-        Column("id", Integer, Sequence("user_id_seq"), primary_key=True),
-        Column("name", String),
-        Column("fullname", String),
-    )
-    metadata.create_all(engine_testaccount)
+    users = User.__table__
+    users.metadata.create_all(engine_testaccount)
 
     data = [
         {

@@ -3,6 +3,7 @@
 #
 
 from sqlalchemy import Column, Integer, MetaData, Sequence, String, Table, inspect
+from sqlalchemy import create_engine
 
 
 def test_table_name_with_reserved_words(engine_testaccount, db_parameters):
@@ -36,7 +37,7 @@ def test_table_name_with_reserved_words(engine_testaccount, db_parameters):
         assert len(columns_in_insert) == 3
 
     finally:
-        insert_table.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
     return insert_table
 
 
@@ -59,5 +60,5 @@ def test_table_column_as_underscore(engine_testaccount):
         assert columns_in_insert[1]["name"] == "cb"
         assert columns_in_insert[2]["name"] == "_"
     finally:
-        insert_table.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
     return insert_table

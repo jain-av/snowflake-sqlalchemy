@@ -13,11 +13,12 @@ from logging import getLogger
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
+from sqlalchemy.engine import make_url
 
 import snowflake.connector
 import snowflake.connector.connection
 from snowflake.connector.compat import IS_WINDOWS
-from snowflake.sqlalchemy import URL, dialect
+from snowflake.sqlalchemy import dialect
 from snowflake.sqlalchemy._constants import (
     APPLICATION_NAME,
     PARAM_APPLICATION,
@@ -190,13 +191,15 @@ def get_db_parameters() -> dict:
     return ret
 
 
-def url_factory(**kwargs) -> URL:
+def url_factory(**kwargs):
     url_params = get_db_parameters()
     url_params.update(kwargs)
-    return URL(**url_params)
+    return make_url(
+        f"snowflake://{url_params['user']}:{url_params['password']}@{url_params['account']}/{url_params['database']}/{url_params['schema']}?protocol={url_params['protocol']}&host={url_params['host']}&port={url_params['port']}"
+    )
 
 
-def get_engine(url: URL, **engine_kwargs):
+def get_engine(url, **engine_kwargs):
     engine_params = {
         "poolclass": NullPool,
         "future": True,

@@ -3,6 +3,7 @@
 #
 
 from sqlalchemy.engine.url import URL
+from sqlalchemy.engine import make_url
 
 from snowflake.sqlalchemy import base
 
@@ -13,13 +14,9 @@ def test_create_connect_args():
     test_data = [
         (
             # 0: full host name and no account
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount.snowflakecomputing.com",
-                query={},
-            ),
+            make_url(
+                "snowflake://testuser:testpassword@testaccount.snowflakecomputing.com"
+            ).set_query({}),
             {
                 "autocommit": False,
                 "host": "testaccount.snowflakecomputing.com",
@@ -29,13 +26,7 @@ def test_create_connect_args():
         ),
         (
             # 1: account name only
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount",
-                query={},
-            ),
+            make_url("snowflake://testuser:testpassword@testaccount").set_query({}),
             {
                 "autocommit": False,
                 "host": "testaccount.snowflakecomputing.com",
@@ -47,13 +38,7 @@ def test_create_connect_args():
         ),
         (
             # 2: account name including region
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount.eu-central-1",
-                query={},
-            ),
+            make_url("snowflake://testuser:testpassword@testaccount.eu-central-1").set_query({}),
             {
                 "autocommit": False,
                 "host": "testaccount.eu-central-1.snowflakecomputing.com",
@@ -65,13 +50,9 @@ def test_create_connect_args():
         ),
         (
             # 3: full host including region
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount.eu-central-1.snowflakecomputing.com",
-                query={},
-            ),
+            make_url(
+                "snowflake://testuser:testpassword@testaccount.eu-central-1.snowflakecomputing.com"
+            ).set_query({}),
             {
                 "autocommit": False,
                 "host": "testaccount.eu-central-1.snowflakecomputing.com",
@@ -81,13 +62,9 @@ def test_create_connect_args():
         ),
         (
             # 4: full host including region and account
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount.eu-central-1.snowflakecomputing.com",
-                query={"account": "testaccount"},
-            ),
+            make_url(
+                "snowflake://testuser:testpassword@testaccount.eu-central-1.snowflakecomputing.com"
+            ).set_query({"account": "testaccount"}),
             {
                 "autocommit": False,
                 "host": "testaccount.eu-central-1.snowflakecomputing.com",
@@ -98,13 +75,9 @@ def test_create_connect_args():
         ),
         (
             # 5: full host including region and account including region
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount.eu-central-1.snowflakecomputing.com",
-                query={"account": "testaccount.eu-central-1"},
-            ),
+            make_url(
+                "snowflake://testuser:testpassword@testaccount.eu-central-1.snowflakecomputing.com"
+            ).set_query({"account": "testaccount.eu-central-1"}),
             {
                 "autocommit": False,
                 "host": "testaccount.eu-central-1.snowflakecomputing.com",
@@ -115,14 +88,9 @@ def test_create_connect_args():
         ),
         (
             # 6: full host including region and account including region
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="snowflake.reg.local",
-                port="8082",
-                query={"account": "testaccount"},
-            ),
+            make_url(
+                "snowflake://testuser:testpassword@snowflake.reg.local:8082"
+            ).set_query({"account": "testaccount"}),
             {
                 "autocommit": False,
                 "host": "snowflake.reg.local",
@@ -134,11 +102,8 @@ def test_create_connect_args():
         ),
         (
             # 7: Global URL
-            URL.create(
-                "snowflake",
-                username="testuser",
-                password="testpassword",
-                host="testaccount-hso894gsiuafdhsaj935.global",
+            make_url(
+                "snowflake://testuser:testpassword@testaccount-hso894gsiuafdhsaj935.global"
             ),
             {
                 "autocommit": False,

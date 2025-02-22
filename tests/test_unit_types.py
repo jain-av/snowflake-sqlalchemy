@@ -4,6 +4,7 @@
 
 import snowflake.sqlalchemy
 from snowflake.sqlalchemy.snowdialect import SnowflakeDialect
+from sqlalchemy import types
 
 from .util import ischema_names_baseline
 
