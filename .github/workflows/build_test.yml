@@ -60,4 +60,3 @@ jobs:
         run: |
           python -m uv pip install dist/snowflake_sqlalchemy-*.whl
           python -c "import snowflake.sqlalchemy; print(snowflake.sqlalchemy.__version__)"
-
