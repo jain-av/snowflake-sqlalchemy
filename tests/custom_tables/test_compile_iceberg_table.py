@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import IcebergTable
 from snowflake.sqlalchemy.sql.custom_schema.options import (
@@ -28,7 +28,7 @@ def test_compile_iceberg_table(sql_compiler, snapshot):
 
     value = CreateTable(test_table)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -47,7 +47,7 @@ def test_compile_iceberg_table_with_options_objects(sql_compiler, snapshot):
 
     value = CreateTable(test_table)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -82,7 +82,7 @@ def test_compile_icberg_table_with_primary_key(sql_compiler, snapshot):
 
     value = CreateTable(test_table)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -111,6 +111,6 @@ def test_compile_dynamic_table_orm_with_as_query(sql_compiler, snapshot):
 
     value = CreateTable(TestDynamicTableOrm.__table__)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot

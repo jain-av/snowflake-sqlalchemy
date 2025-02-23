@@ -3,6 +3,7 @@
 #
 from sqlalchemy import Column, Integer, MetaData, String, select, text
 from sqlalchemy.orm import Session, declarative_base
+from sqlalchemy.orm import sessionmaker
 
 from snowflake.sqlalchemy import SnowflakeTable
 
@@ -31,7 +32,8 @@ def test_create_snowflake_table_with_cluster_by(
     try:
         with engine_testaccount.connect() as conn:
             s = select(test_table_1)
-            results_hybrid_table = conn.execute(s).fetchall()
+            result = conn.execute(s)
+            results_hybrid_table = result.fetchall()
             assert str(results_hybrid_table) == snapshot
     finally:
         metadata.drop_all(engine_testaccount)
@@ -39,7 +41,8 @@ def test_create_snowflake_table_with_cluster_by(
 
 def test_create_snowflake_table_with_orm(sql_compiler, engine_testaccount):
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    SessionLocal = sessionmaker(bind=engine_testaccount)
+    session = SessionLocal()
 
     class TestHybridTableOrm(Base):
         __tablename__ = "test_snowflake_table_orm"
@@ -60,7 +63,7 @@ def test_create_snowflake_table_with_orm(sql_compiler, engine_testaccount):
         instance = TestHybridTableOrm(id=0, name="name_example")
         session.add(instance)
         session.commit()
-        data = session.query(TestHybridTableOrm).all()
+        data = session.execute(select(TestHybridTableOrm)).scalars().all()
         assert str(data) == "[(0, 'name_example')]"
     finally:
         Base.metadata.drop_all(engine_testaccount)

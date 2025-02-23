@@ -13,7 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import SnowflakeTable
 from snowflake.sqlalchemy.sql.custom_schema.options import (
@@ -36,7 +36,7 @@ def test_compile_snowflake_table(sql_compiler, snapshot):
 
     value = CreateTable(test_geometry)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -55,7 +55,7 @@ def test_compile_snowflake_table_with_explicit_options(sql_compiler, snapshot):
 
     value = CreateTable(test_geometry)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -90,7 +90,7 @@ def test_compile_snowflake_table_with_primary_key(sql_compiler, snapshot):
 
     value = CreateTable(test_geometry)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -121,7 +121,7 @@ def test_compile_snowflake_table_with_foreign_key(sql_compiler, snapshot):
 
     value = CreateTable(test_geometry)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -150,7 +150,7 @@ def test_compile_snowflake_table_orm_with_str_keys(sql_compiler, snapshot):
 
     value = CreateTable(TestSnowflakeTableOrm.__table__)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
 
@@ -175,6 +175,6 @@ def test_compile_snowflake_table_with_selectable(sql_compiler, snapshot):
 
     value = CreateTable(test_table_2)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler.process(value)
 
     assert actual == snapshot
