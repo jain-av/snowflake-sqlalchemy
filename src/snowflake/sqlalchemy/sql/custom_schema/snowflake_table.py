@@ -4,7 +4,7 @@
 
 from typing import Any
 
-from sqlalchemy.sql.schema import MetaData, SchemaItem
+from sqlalchemy.schema import MetaData, SchemaItem
 
 from .table_from_query import TableFromQueryBase
 

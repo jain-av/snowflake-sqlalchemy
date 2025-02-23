@@ -4,7 +4,8 @@
 
 from typing import Any, Optional
 
-from sqlalchemy.sql.schema import MetaData, SchemaItem
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.schema import MetaData, SchemaItem
 
 from .custom_table_base import CustomTableBase
 from .options.as_query_option import AsQueryOption

@@ -1,10 +1,10 @@
 #
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 
-from enum import Enum
+import enum
 
 
-class CustomTablePrefix(Enum):
+class CustomTablePrefix(enum.Enum):
     DEFAULT = 0
     EXTERNAL = 1
     EVENT = 2

@@ -4,7 +4,7 @@
 import typing
 from typing import Any, List
 
-from sqlalchemy.sql.schema import MetaData, SchemaItem, Table
+from sqlalchemy.schema import MetaData, SchemaItem, Table
 
 from ..._constants import DIALECT_NAME
 from ...compat import IS_VERSION_20
@@ -44,11 +44,7 @@ class CustomTableBase(Table):
             prefixes = kw.get("prefixes", []) + self.table_prefixes
             kw.update(prefixes=prefixes)
 
-        if not IS_VERSION_20 and hasattr(super(), "_init"):
-            kw.pop("_no_init", True)
-            super()._init(name, metadata, *args, **kw)
-        else:
-            super().__init__(name, metadata, *args, **kw)
+        super().__init__(name, metadata, *args, **kw)
 
         if not kw.get("autoload_with", False):
             self._validate_table()
