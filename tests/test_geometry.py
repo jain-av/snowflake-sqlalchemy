@@ -25,7 +25,7 @@ def test_create_table_geometry_datatypes(engine_testaccount):
     try:
         assert test_geometry is not None
     finally:
-        test_geometry.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
 
 
 def test_inspect_geometry_datatypes(engine_testaccount):
@@ -53,15 +53,15 @@ def test_inspect_geometry_datatypes(engine_testaccount):
             )
 
             with conn.begin():
-                results = conn.execute(ins)
-                results.close()
-
+                result = conn.execute(ins)
+                conn.commit()
+                
                 s = select(test_geometry)
-                results = conn.execute(s)
-                rows = results.fetchone()
-                results.close()
+                result = conn.execute(s)
+                rows = result.fetchone()
                 assert rows[0] == 1
                 assert rows[1] == rows[2]
                 assert loads(rows[2]) == loads(test_point1)
+                result.close()
     finally:
-        test_geometry.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)

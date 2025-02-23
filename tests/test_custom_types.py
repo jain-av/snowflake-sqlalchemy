@@ -4,6 +4,8 @@
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, text
+from sqlalchemy.sql import column
+from sqlalchemy.sql.ddl import CreateTable
 
 from snowflake.sqlalchemy import TEXT, custom_types
 
@@ -64,4 +66,5 @@ def test_create_table_with_text_type(engine_testaccount):
                 ), f"Expected VARCHAR(134217728) in {row}"
 
     finally:
-        test_max_lob_size.drop(engine_testaccount)
+        metadata.drop_all(engine_testaccount)
+    #     test_max_lob_size.drop(engine_testaccount)

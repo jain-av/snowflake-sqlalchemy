@@ -3,7 +3,7 @@
 #
 import pytest
 from sqlalchemy import MetaData, inspect
-from sqlalchemy.sql.ddl import CreateSchema, DropSchema
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 
 @pytest.mark.aws
@@ -25,7 +25,7 @@ def test_indexes_reflection(engine_testaccount, db_parameters, sql_compiler):
     """
 
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_table_sql)
+        connection.execute(create_table_sql)
 
     insp = inspect(engine_testaccount)
 
@@ -55,7 +55,7 @@ def test_simple_reflection_hybrid_table_as_table(
             create_table_sql = f"""
            CREATE HYBRID TABLE {schema}.{table_name} (id INT primary key, new_column VARCHAR, INDEX index_name (new_column));
             """
-            connection.exec_driver_sql(create_table_sql)
+            connection.execute(create_table_sql)
 
             metadata.reflect(engine_testaccount, schema=schema)
 

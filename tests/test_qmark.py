@@ -8,6 +8,7 @@ import sys
 import pandas as pd
 import pytest
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -22,14 +23,16 @@ def test_qmark_bulk_insert(engine_testaccount_with_qmark):
         )
 
     with engine_testaccount_with_qmark.connect() as con:
-        with con.begin():
-            con.exec_driver_sql(
-                """
+        with Session(con) as session:
+            session.execute(
+                text(
+                    """
                 create or replace table src(c1 int, c2 string) as select seq8(),
                 randstr(100, random()) from table(generator(rowcount=>100000))
                 """
+                )
             )
-            con.exec_driver_sql("create or replace table dst like src")
+            session.execute(text("create or replace table dst like src"))
 
             for data in pd.read_sql_query(
                 text("select * from src"), con, chunksize=16000
@@ -37,3 +40,4 @@ def test_qmark_bulk_insert(engine_testaccount_with_qmark):
                 data.to_sql(
                     "dst", con, if_exists="append", index=False, index_label=None
                 )
+            session.commit()

@@ -3,6 +3,7 @@
 #
 
 from sqlalchemy import Column, Integer, MetaData, String, select, text
+from sqlalchemy.orm import Session
 
 from snowflake.sqlalchemy import SnowflakeTable
 

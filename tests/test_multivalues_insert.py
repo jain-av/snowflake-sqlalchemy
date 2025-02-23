@@ -5,6 +5,7 @@
 from sqlalchemy import Integer, Sequence, String
 from sqlalchemy.schema import Column, MetaData, Table
 from sqlalchemy.sql import select
+from sqlalchemy import insert
 
 
 def test_insert_table(engine_testaccount):
@@ -34,7 +35,7 @@ def test_insert_table(engine_testaccount):
         with engine_testaccount.connect() as conn:
             # using multivalue insert
             with conn.begin():
-                conn.execute(users.insert().values(data))
+                conn.execute(insert(users).values(data))
                 results = conn.execute(select(users).order_by("id"))
                 row = results.fetchone()
                 assert row._mapping["name"] == "testname1"

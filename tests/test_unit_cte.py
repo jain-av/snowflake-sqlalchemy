@@ -7,6 +7,7 @@ def test_cte():
     from datetime import date
 
     from sqlalchemy import Column, Date, Integer, MetaData, Table, literal, select
+    from sqlalchemy.orm import Session
 
     from snowflake.sqlalchemy import snowdialect
 
@@ -26,9 +27,10 @@ def test_cte():
     ins = visitors.insert().from_select(
         [visitors.c.product_id, visitors.c.date1, visitors.c.count], sel
     )
-    assert str(ins.compile(dialect=snowdialect.dialect())) == (
+    compiled = ins.compile(dialect=snowdialect.dialect())
+    assert str(compiled) == (
         "INSERT INTO visitors (product_id, date1, count) WITH bar AS \n"
-        "(SELECT %(param_1)s AS anon_1, %(param_2)s AS anon_2, %(param_3)s AS anon_3)\n"
+        "(SELECT :param_1 AS anon_1, :param_2 AS anon_2, :param_3 AS anon_3)\n"
         " SELECT bar.anon_1, bar.anon_2, bar.anon_3 \n"
         "FROM bar"
     )
