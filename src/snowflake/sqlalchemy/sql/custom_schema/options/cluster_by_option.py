@@ -3,7 +3,7 @@
 #
 from typing import List, Union
 
-from sqlalchemy.sql.expression import TextClause
+from sqlalchemy.sql import TextClause
 
 from snowflake.sqlalchemy.custom_commands import NoneType
 
