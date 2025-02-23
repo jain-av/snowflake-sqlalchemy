@@ -4,6 +4,7 @@
 from typing import Optional, Union
 
 from sqlalchemy.sql import Selectable
+from sqlalchemy.sql.compiler import Compiled
 
 from snowflake.sqlalchemy.custom_commands import NoneType
 
@@ -54,6 +55,8 @@ class AsQueryOption(TableOption):
         return self.query
 
     def _render(self, compiler) -> str:
+        if isinstance(self.__get_expression(), Compiled):
+            return self.template() % (self.__get_expression().string)
         return self.template() % (self.__get_expression())
 
     def __repr__(self) -> str:

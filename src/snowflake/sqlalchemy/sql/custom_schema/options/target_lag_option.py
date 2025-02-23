@@ -55,9 +55,9 @@ class TargetLagOption(TableOption):
         value: Union["TargetLagOption", Tuple[int, TimeUnit], KeywordOptionType]
     ) -> Optional[TableOption]:
         if isinstance(value, NoneType):
-            return value
+            return None
 
-        if isinstance(value, Tuple):
+        if isinstance(value, tuple):
             time, unit = value
             value = TargetLagOption(time, unit)
 

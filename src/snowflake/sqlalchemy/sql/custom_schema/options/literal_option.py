@@ -31,7 +31,7 @@ class LiteralOption(TableOption):
     def create(
         name: TableOptionKey, value: Optional[Union[str, int, "LiteralOption"]]
     ) -> Optional[TableOption]:
-        if isinstance(value, NoneType):
+        if value is None:
             return None
         if isinstance(value, (str, int)):
             value = LiteralOption(value)
@@ -58,7 +58,7 @@ class LiteralOption(TableOption):
     def __repr__(self) -> str:
         option_name = (
             f", table_option_key={self.option_name}"
-            if not isinstance(self.option_name, NoneType)
+            if self.option_name is not None
             else ""
         )
         return f"LiteralOption(value='{self.value}'{option_name})"

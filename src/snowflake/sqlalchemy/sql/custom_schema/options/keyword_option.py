@@ -3,8 +3,6 @@
 #
 from typing import Optional, Union
 
-from snowflake.sqlalchemy.custom_commands import NoneType
-
 from .keywords import SnowflakeKeyword
 from .table_option import Priority, TableOption, TableOptionKey
 
@@ -38,7 +36,7 @@ class KeywordOption(TableOption):
     def create(
         name: TableOptionKey, value: Optional[Union[SnowflakeKeyword, "KeywordOption"]]
     ) -> Optional[TableOption]:
-        if isinstance(value, NoneType):
+        if value is None:
             return value
         if isinstance(value, SnowflakeKeyword):
             value = KeywordOption(value)
@@ -56,7 +54,7 @@ class KeywordOption(TableOption):
     def __repr__(self) -> str:
         option_name = (
             f", table_option_key={self.option_name}"
-            if isinstance(self.option_name, NoneType)
+            if self.option_name is None
             else ""
         )
         return f"KeywordOption(value='{self.value}'{option_name})"
