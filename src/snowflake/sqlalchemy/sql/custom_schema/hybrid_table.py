@@ -4,7 +4,7 @@
 
 from typing import Any
 
-from sqlalchemy.sql.schema import MetaData, SchemaItem
+from sqlalchemy.schema import MetaData, SchemaItem
 
 from .custom_table_base import CustomTableBase
 from .custom_table_prefix import CustomTablePrefix

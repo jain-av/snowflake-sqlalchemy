@@ -13,7 +13,6 @@ from .options.table_option import TableOptionKey
 
 
 class TableFromQueryBase(ClusteredTableBase):
-
     @property
     def as_query(self) -> Optional[AsQueryOption]:
         return self._get_dialect_option(TableOptionKey.AS_QUERY)
@@ -42,13 +41,14 @@ class TableFromQueryBase(ClusteredTableBase):
         for item in items:
             if isinstance(item, Column):
                 return True
+        return False
 
     def __create_columns_from_selectable(
         self, selectable: Selectable
     ) -> Optional[typing.List[Column]]:
         if not isinstance(selectable, Selectable):
-            return
+            return None
         columns: typing.List[Column] = []
-        for _, c in selectable.exported_columns.items():
+        for c in selectable.exported_columns:
             columns += [Column(c.name, c.type)]
         return columns
