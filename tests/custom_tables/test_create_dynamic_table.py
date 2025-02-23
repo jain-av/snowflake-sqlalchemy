@@ -3,6 +3,7 @@
 #
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
+from sqlalchemy.orm import Session
 
 from snowflake.sqlalchemy import DynamicTable, exc
 from snowflake.sqlalchemy.sql.custom_schema.options.as_query_option import AsQueryOption
@@ -26,7 +27,7 @@ def test_create_dynamic_table(engine_testaccount, db_parameters):
 
     metadata.create_all(engine_testaccount)
 
-    with engine_testaccount.connect() as conn:
+    with Session(engine_testaccount) as conn:
         ins = test_table_1.insert().values(id=1, name="test")
 
         conn.execute(ins)
@@ -46,7 +47,7 @@ def test_create_dynamic_table(engine_testaccount, db_parameters):
     metadata.create_all(engine_testaccount)
 
     try:
-        with engine_testaccount.connect() as conn:
+        with Session(engine_testaccount) as conn:
             s = select(dynamic_test_table_1)
             results_dynamic_table = conn.execute(s).fetchall()
             s = select(test_table_1)
@@ -68,7 +69,7 @@ def test_create_dynamic_table_without_dynamictable_class(
 
     metadata.create_all(engine_testaccount)
 
-    with engine_testaccount.connect() as conn:
+    with Session(engine_testaccount) as conn:
         ins = test_table_1.insert().values(id=1, name="test")
 
         conn.execute(ins)
@@ -100,7 +101,7 @@ def test_create_dynamic_table_without_dynamictable_and_defined_options(
 
     metadata.create_all(engine_testaccount)
 
-    with engine_testaccount.connect() as conn:
+    with Session(engine_testaccount) as conn:
         ins = test_table_1.insert().values(id=1, name="test")
 
         conn.execute(ins)

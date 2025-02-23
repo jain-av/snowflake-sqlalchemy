@@ -14,7 +14,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import GEOMETRY, DynamicTable
 from snowflake.sqlalchemy.exc import MultipleErrors

@@ -32,14 +32,14 @@ def test_identifier_option_without_name(snapshot):
     identifier = IdentifierOption("xsmall")
     with pytest.raises(exc.OptionKeyNotProvidedError) as exc_info:
         identifier.render_option(None)
-    assert exc_info.value == snapshot
+    assert exc_info.value == snapshot.value
 
 
 def test_identifier_option_with_wrong_type(snapshot):
     identifier = IdentifierOption.create(TableOptionKey.WAREHOUSE, 23)
     with pytest.raises(exc.InvalidTableParameterTypeError) as exc_info:
         identifier.render_option(None)
-    assert exc_info.value == snapshot
+    assert exc_info.value == snapshot.value
 
 
 def test_literal_option_with_wrong_type(snapshot):
@@ -48,14 +48,14 @@ def test_literal_option_with_wrong_type(snapshot):
     )
     with pytest.raises(exc.InvalidTableParameterTypeError) as exc_info:
         literal.render_option(None)
-    assert exc_info.value == snapshot
+    assert exc_info.value == snapshot.value
 
 
 def test_invalid_as_query_option(snapshot):
     as_query = AsQueryOption.create(23)
     with pytest.raises(exc.InvalidTableParameterTypeError) as exc_info:
         as_query.render_option(None)
-    assert exc_info.value == snapshot
+    assert exc_info.value == snapshot.value
 
 
 @pytest.mark.parametrize(

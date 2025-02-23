@@ -4,6 +4,7 @@
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.orm import Session
 
 from snowflake.sqlalchemy import IcebergTable
 
@@ -26,7 +27,7 @@ def test_create_iceberg_table(engine_testaccount, snapshot):
           );
         """
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_external_volume)
+        connection.execute(create_external_volume)
     IcebergTable(
         "Iceberg_Table_1",
         metadata,

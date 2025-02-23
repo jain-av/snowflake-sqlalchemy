@@ -3,7 +3,7 @@
 #
 import pytest
 from sqlalchemy import MetaData, Table
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 
 @pytest.mark.aws
@@ -18,7 +18,7 @@ def test_simple_reflection_hybrid_table_as_table(
     """
 
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_table_sql)
+        connection.execute(create_table_sql)
 
     hybrid_test_table = Table(table_name, metadata, autoload_with=engine_testaccount)
 
@@ -27,10 +27,10 @@ def test_simple_reflection_hybrid_table_as_table(
     hybrid_test_table.constraints.add(constraint)
 
     try:
-        with engine_testaccount.connect():
+        with engine_testaccount.connect() as conn:
             value = CreateTable(hybrid_test_table)
 
-            actual = sql_compiler(value)
+            actual = sql_compiler(value.compile(dialect=engine_testaccount.dialect))
 
             # Prefixes reflection not supported, example: "HYBRID, DYNAMIC"
             assert actual == snapshot
@@ -54,7 +54,7 @@ def test_reflect_hybrid_table_with_index(
         """
 
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_table_sql)
+        connection.execute(create_table_sql)
 
     table = Table(table_name, metadata, schema=schema, autoload_with=engine_testaccount)
 

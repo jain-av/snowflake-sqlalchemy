@@ -4,7 +4,7 @@
 
 from sqlalchemy import Column, Integer, MetaData, String
 from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.ddl import CreateTable
+from sqlalchemy.schema import CreateTable
 
 from snowflake.sqlalchemy import ARRAY, GEOMETRY, HybridTable
 
@@ -22,7 +22,7 @@ def test_compile_hybrid_table(sql_compiler, snapshot):
 
     value = CreateTable(test_geometry)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler(value.compile())
 
     assert actual == snapshot
 
@@ -41,7 +41,7 @@ def test_compile_hybrid_table_with_array(sql_compiler, snapshot):
 
     value = CreateTable(test_geometry)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler(value.compile())
 
     assert actual == snapshot
 
@@ -64,6 +64,6 @@ def test_compile_hybrid_table_orm(sql_compiler, snapshot):
 
     value = CreateTable(TestHybridTableOrm.__table__)
 
-    actual = sql_compiler(value)
+    actual = sql_compiler(value.compile())
 
     assert actual == snapshot

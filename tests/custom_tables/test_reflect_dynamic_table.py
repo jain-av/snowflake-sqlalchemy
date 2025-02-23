@@ -2,6 +2,7 @@
 # Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
 #
 from sqlalchemy import Column, Integer, MetaData, String, Table, select
+from sqlalchemy.orm import Session
 
 from snowflake.sqlalchemy import DynamicTable
 from snowflake.sqlalchemy.custom_commands import NoneType
@@ -16,7 +17,7 @@ def test_simple_reflection_dynamic_table_as_table(engine_testaccount, db_paramet
 
     metadata.create_all(engine_testaccount)
 
-    with engine_testaccount.connect() as conn:
+    with Session(engine_testaccount) as conn:
         ins = test_table_1.insert().values(id=1, name="test")
 
         conn.execute(ins)
@@ -35,7 +36,7 @@ def test_simple_reflection_dynamic_table_as_table(engine_testaccount, db_paramet
     )
 
     try:
-        with engine_testaccount.connect() as conn:
+        with Session(engine_testaccount) as conn:
             s = select(dynamic_test_table)
             results_dynamic_table = conn.execute(s).fetchall()
             s = select(test_table_1)
@@ -55,7 +56,7 @@ def test_simple_reflection_without_options_loading(engine_testaccount, db_parame
 
     metadata.create_all(engine_testaccount)
 
-    with engine_testaccount.connect() as conn:
+    with Session(engine_testaccount) as conn:
         ins = test_table_1.insert().values(id=1, name="test")
 
         conn.execute(ins)
@@ -77,7 +78,7 @@ def test_simple_reflection_without_options_loading(engine_testaccount, db_parame
     assert isinstance(dynamic_test_table.warehouse, NoneType)
 
     try:
-        with engine_testaccount.connect() as conn:
+        with Session(engine_testaccount) as conn:
             s = select(dynamic_test_table)
             results_dynamic_table = conn.execute(s).fetchall()
             s = select(test_table_1)
