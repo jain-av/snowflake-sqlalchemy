@@ -3,7 +3,6 @@
 from typing import List
 
 import sqlalchemy.types as sqltypes
-from sqlalchemy.sql.type_api import TypeEngine
 from sqlalchemy.types import (
     BIGINT,
     BINARY,
@@ -21,6 +20,7 @@ from sqlalchemy.types import (
     VARCHAR,
     NullType,
 )
+from sqlalchemy.types import TypeEngine
 
 from ..custom_types import (
     _CUSTOM_DECIMAL,
