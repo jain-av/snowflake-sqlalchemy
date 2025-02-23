@@ -3,12 +3,12 @@
 
 import warnings
 
-from sqlalchemy.sql import functions as sqlfunc
+from sqlalchemy import func
 
 FLATTEN_WARNING = "For backward compatibility params are not rendered."
 
 
-class flatten(sqlfunc.GenericFunction):
+class flatten(func.GenericFunction):
     name = "flatten"
 
     def __init__(self, *args, **kwargs):
