@@ -3,17 +3,8 @@
 #
 import pytest
 import sqlalchemy as sa
-from sqlalchemy import (
-    Column,
-    Integer,
-    MetaData,
-    Sequence,
-    Table,
-    cast,
-    exc,
-    inspect,
-    text,
-)
+from sqlalchemy import Column, Integer, MetaData, Sequence, Table, cast, inspect, text
+from sqlalchemy.exc import ProgrammingError, exc
 from sqlalchemy.orm import Session, declarative_base
 from sqlalchemy.sql import select
 from sqlalchemy.sql.ddl import CreateTable
@@ -79,7 +70,7 @@ def test_insert_map(engine_testaccount, external_volume, base_location, snapshot
     try:
         with engine_testaccount.connect() as conn:
             slt = select(
-                1,
+                sa.literal(1),
                 cast(
                     text("{'100':'item1', '200':'item2'}"),
                     MAP(NUMBER(10, 0), TEXT(16777216)),
@@ -89,7 +80,7 @@ def test_insert_map(engine_testaccount, external_volume, base_location, snapshot
             conn.execute(ins)
 
             results = conn.execute(test_map.select())
-            data = results.fetchmany()
+            data = results.fetchall()
             results.close()
             snapshot.assert_match(data)
     finally:
@@ -101,7 +92,7 @@ def test_insert_map_orm(
     sql_compiler, external_volume, base_location, engine_testaccount, snapshot
 ):
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestIcebergTableOrm(Base):
         __tablename__ = "test_iceberg_table_orm"
@@ -129,7 +120,7 @@ def test_insert_map_orm(
         )
         instance = TestIcebergTableOrm(id=0, map_id=cast_expr)
         session.add(instance)
-        with pytest.raises(exc.ProgrammingError) as programming_error:
+        with pytest.raises(ProgrammingError) as programming_error:
             session.commit()
         # TODO: Support variant in insert statement
         assert str(programming_error.value.orig) == snapshot
@@ -153,14 +144,14 @@ def test_select_map_orm(engine_testaccount, external_volume, base_location, snap
 
     with engine_testaccount.connect() as conn:
         slt1 = select(
-            2,
+            sa.literal(2),
             cast(
                 text("{'100':'item1', '200':'item2'}"),
                 MAP(NUMBER(10, 0), TEXT(16777216)),
             ),
         )
         slt2 = select(
-            1,
+            sa.literal(1),
             cast(
                 text("{'100':'item1', '200':'item2'}"),
                 MAP(NUMBER(10, 0), TEXT(16777216)),
@@ -171,7 +162,7 @@ def test_select_map_orm(engine_testaccount, external_volume, base_location, snap
         conn.commit()
 
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestIcebergTableOrm(Base):
         __table__ = test_map
@@ -180,7 +171,7 @@ def test_select_map_orm(engine_testaccount, external_volume, base_location, snap
             return f"({self.id!r}, {self.map_id!r})"
 
     try:
-        data = session.query(TestIcebergTableOrm).all()
+        data = session.execute(select(TestIcebergTableOrm)).scalars().all()
         snapshot.assert_match(data)
     finally:
         test_map.drop(engine_testaccount)
@@ -202,14 +193,14 @@ def test_select_array_orm(engine_testaccount, external_volume, base_location, sn
 
     with engine_testaccount.connect() as conn:
         slt1 = select(
-            2,
+            sa.literal(2),
             cast(
                 text("['item1','item2']"),
                 ARRAY(TEXT(16777216)),
             ),
         )
         slt2 = select(
-            1,
+            sa.literal(1),
             cast(
                 text("['item3','item4']"),
                 ARRAY(TEXT(16777216)),
@@ -220,7 +211,7 @@ def test_select_array_orm(engine_testaccount, external_volume, base_location, sn
         conn.commit()
 
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestIcebergTableOrm(Base):
         __table__ = test_map
@@ -229,7 +220,7 @@ def test_select_array_orm(engine_testaccount, external_volume, base_location, sn
             return f"({self.id!r}, {self.array_col!r})"
 
     try:
-        data = session.query(TestIcebergTableOrm).all()
+        data = session.execute(select(TestIcebergTableOrm)).scalars().all()
         snapshot.assert_match(data)
     finally:
         test_map.drop(engine_testaccount)
@@ -252,7 +243,7 @@ def test_insert_array(engine_testaccount, external_volume, base_location, snapsh
     try:
         with engine_testaccount.connect() as conn:
             slt = select(
-                1,
+                sa.literal(1),
                 cast(
                     text("['item1','item2']"),
                     ARRAY(TEXT(16777216)),
@@ -262,7 +253,7 @@ def test_insert_array(engine_testaccount, external_volume, base_location, snapsh
             conn.execute(ins)
 
             results = conn.execute(test_map.select())
-            data = results.fetchmany()
+            data = results.fetchall()
             results.close()
             snapshot.assert_match(data)
     finally:
@@ -274,7 +265,7 @@ def test_insert_array_orm(
     sql_compiler, external_volume, base_location, engine_testaccount, snapshot
 ):
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestIcebergTableOrm(Base):
         __tablename__ = "test_iceberg_table_orm"
@@ -300,7 +291,7 @@ def test_insert_array_orm(
         cast_expr = cast(text("['item1','item2']"), ARRAY(TEXT(16777216)))
         instance = TestIcebergTableOrm(id=0, array_col=cast_expr)
         session.add(instance)
-        with pytest.raises(exc.ProgrammingError) as programming_error:
+        with pytest.raises(ProgrammingError) as programming_error:
             session.commit()
         # TODO: Support variant in insert statement
         assert str(programming_error.value.orig) == snapshot
@@ -330,7 +321,7 @@ def test_insert_structured_object(
     try:
         with engine_testaccount.connect() as conn:
             slt = select(
-                1,
+                sa.literal(1),
                 cast(
                     text("{'key1':'item1', 'key2': 15}"),
                     OBJECT(key1=(TEXT(16777216), False), key2=(NUMBER(10, 0), False)),
@@ -339,8 +330,8 @@ def test_insert_structured_object(
             ins = test_map.insert().from_select(["id", "object_col"], slt)
             conn.execute(ins)
 
-            results = conn.execute(test_map.select())
-            data = results.fetchmany()
+            results = conn.execute(sa.select(test_map))
+            data = results.scalars().all()
             results.close()
             snapshot.assert_match(data)
     finally:
@@ -352,7 +343,7 @@ def test_insert_structured_object_orm(
     sql_compiler, external_volume, base_location, engine_testaccount, snapshot
 ):
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestIcebergTableOrm(Base):
         __tablename__ = "test_iceberg_table_orm"
@@ -412,14 +403,14 @@ def test_select_structured_object_orm(
 
     with engine_testaccount.connect() as conn:
         first_select = select(
-            2,
+            sa.literal(2),
             cast(
                 text("{'key1': 'value1', 'key2': 1}"),
                 OBJECT(key1=(TEXT(16777216), False), key2=(NUMBER(10, 0), False)),
             ),
         )
         second_select = select(
-            1,
+            sa.literal(1),
             cast(
                 text("{'key1': 'value2', 'key2': 2}"),
                 OBJECT(key1=(TEXT(16777216), False), key2=(NUMBER(10, 0), False)),
@@ -432,7 +423,7 @@ def test_select_structured_object_orm(
         conn.commit()
 
     Base = declarative_base()
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
 
     class TestIcebergTableOrm(Base):
         __table__ = iceberg_table
@@ -441,7 +432,7 @@ def test_select_structured_object_orm(
             return f"({self.id!r}, {self.structured_obj_col!r})"
 
     try:
-        data = session.query(TestIcebergTableOrm).all()
+        data = session.execute(sa.select(TestIcebergTableOrm)).scalars().all()
         snapshot.assert_match(data)
     finally:
         iceberg_table.drop(engine_testaccount)
@@ -522,7 +513,7 @@ BASE_LOCATION = '{base_location}';
       """
 
     with engine_testaccount.connect() as connection:
-        connection.exec_driver_sql(create_table_sql)
+        connection.execute(sa.text(create_table_sql))
 
     iceberg_table = IcebergTable(table_name, metadata, autoload_with=engine_testaccount)
     constraint = iceberg_table.constraints.pop()

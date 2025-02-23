@@ -4,7 +4,8 @@
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, Sequence, String, Table
-from sqlalchemy.sql import functions, select, text
+from sqlalchemy import select, text
+from sqlalchemy.sql import functions
 
 from snowflake.sqlalchemy import (
     AWSBucket,
@@ -270,7 +271,6 @@ def test_copy_into_storage_csv_extended(sql_compiler):
         r"SKIP_HEADER=1 TRIM_SPACE=False) force = TRUE pattern = '.*csv'"
     )
     assert result == expected
-
 
 def test_copy_into_storage_parquet_named_format(sql_compiler):
     """

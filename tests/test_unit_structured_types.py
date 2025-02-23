@@ -13,7 +13,7 @@ from src.snowflake.sqlalchemy.parser.custom_type_parser import (
 
 def test_compile_map_with_not_null(snapshot):
     user_table = MAP(NUMBER(10, 0), TEXT(), not_null=True)
-    assert user_table.compile() == snapshot
+    assert str(user_table.compile()) == snapshot
 
 
 def test_extract_parameters():
@@ -78,4 +78,4 @@ def test_extract_parameters():
     ],
 )
 def test_snowflake_data_types(input_type, expected_type):
-    assert parse_type(input_type).compile() == expected_type
+    assert str(parse_type(input_type).compile()) == expected_type

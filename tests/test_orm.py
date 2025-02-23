@@ -19,7 +19,8 @@ from sqlalchemy import (
     select,
     text,
 )
-from sqlalchemy.orm import Session, declarative_base, relationship
+from sqlalchemy.orm import Session, relationship
+from sqlalchemy.ext.declarative import declarative_base
 
 from snowflake.sqlalchemy import HybridTable
 
@@ -49,10 +50,10 @@ def test_basic_orm(engine_testaccount):
     try:
         ed_user = User(name="ed", fullname="Edward Jones")
 
-        session = Session(bind=engine_testaccount)
+        session = Session(engine_testaccount)
         session.add(ed_user)
 
-        our_user = session.query(User).filter_by(name="ed").first()
+        our_user = session.execute(select(User).filter_by(name="ed")).scalar_one()
         assert our_user == ed_user
         session.commit()
     finally:
@@ -100,25 +101,25 @@ def test_orm_one_to_many_relationship(engine_testaccount, db_parameters):
             Address(email_address="jack@hotmail.com"),
         ]
 
-        session = Session(bind=engine_testaccount)
+        session = Session(engine_testaccount)
         session.add(jack)  # cascade each Address into the Session as well
         session.commit()
 
-        got_jack = session.query(User).first()
+        got_jack = session.execute(select(User)).scalar_one()
         assert got_jack == jack
 
         bob = User(name="bob", fullname="Bob Dyran")
 
         session.add(bob)
-        got_bob = session.query(User).filter_by(name="bob").first()
+        got_bob = session.execute(select(User).filter_by(name="bob")).scalar_one()
         assert got_bob == bob
         session.rollback()
-        got_whoever = session.query(User).all()
+        got_whoever = session.execute(select(User)).scalars().all()
         assert len(got_whoever) == 1, "number of user"
         assert got_whoever[0] == jack
 
         session.delete(jack)
-        got_addresses = session.query(Address).all()
+        got_addresses = session.execute(select(Address)).scalars().all()
         assert len(got_addresses) == 3, (
             "address records still remain in no " "cascade mode"
         )
@@ -176,14 +177,14 @@ def test_orm_one_to_many_relationship_with_hybrid_table(engine_testaccount, snap
             Address(email_address="jack@hotmail.com"),
         ]
 
-        session = Session(bind=engine_testaccount)
+        session = Session(engine_testaccount)
         session.add(jack)  # cascade each Address into the Session as well
         session.commit()
 
         session.delete(jack)
 
         with pytest.raises(exc.ProgrammingError) as exc_info:
-            session.query(Address).all()
+            session.execute(select(Address)).scalars().all()
 
         assert exc_info.value == snapshot, "Iceberg Table enforce FK constraint"
 
@@ -236,15 +237,15 @@ def test_delete_cascade(engine_testaccount):
             Address(email_address="jack@hotmail.com"),
         ]
 
-        session = Session(bind=engine_testaccount)
+        session = Session(engine_testaccount)
         session.add(jack)  # cascade each Address into the Session as well
         session.commit()
 
-        got_jack = session.query(User).first()
+        got_jack = session.execute(select(User)).scalar_one()
         assert got_jack == jack
 
         session.delete(jack)
-        got_addresses = session.query(Address).all()
+        got_addresses = session.execute(select(Address)).scalars().all()
         assert len(got_addresses) == 0, "no address record"
     finally:
         Base.metadata.drop_all(engine_testaccount)
@@ -304,15 +305,15 @@ def test_delete_cascade_hybrid_table(engine_testaccount):
             Address(email_address="jack@hotmail.com"),
         ]
 
-        session = Session(bind=engine_testaccount)
+        session = Session(engine_testaccount)
         session.add(jack)  # cascade each Address into the Session as well
         session.commit()
 
-        got_jack = session.query(User).first()
+        got_jack = session.execute(select(User)).scalar_one()
         assert got_jack == jack
 
         session.delete(jack)
-        got_addresses = session.query(Address).all()
+        got_addresses = session.execute(select(Address)).scalars().all()
         assert len(got_addresses) == 0, "no address record"
     finally:
         Base.metadata.drop_all(engine_testaccount)
@@ -344,10 +345,364 @@ def test_orm_query(engine_testaccount):
 
     # TODO: insert rows
 
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
+
+#
+# Copyright (c) 2012-2023 Snowflake Computing Inc. All rights reserved.
+#
+
+import enum
+import logging
+
+import pytest
+from sqlalchemy import (
+    TEXT,
+    Column,
+    Enum,
+    ForeignKey,
+    Integer,
+    Sequence,
+    String,
+    exc,
+    func,
+    select,
+    text,
+)
+from sqlalchemy.orm import Session, declarative_base, relationship
+from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+
+from snowflake.sqlalchemy import HybridTable
+
+
+def test_basic_orm(engine_testaccount):
+    """
+    Tests declarative
+    """
+    Base = declarative_base()
+
+    class UserStatus(enum.Enum):
+        ACTIVE = ("active",)
+        INACTIVE = "inactive"
+
+    class User(Base):
+        __tablename__ = "user"
+
+        id = Column(Integer, Sequence("user_id_seq"), primary_key=True)
+        name = Column(String)
+        fullname = Column(String)
+        status = Column(Enum(UserStatus), default=UserStatus.ACTIVE)
+
+        def __repr__(self):
+            return f"<User({self.name!r}, {self.fullname!r})>"
+
+    Base.metadata.create_all(engine_testaccount)
+    try:
+        ed_user = User(name="ed", fullname="Edward Jones")
+
+        session = Session(engine_testaccount)
+        session.add(ed_user)
+
+        our_user = session.execute(select(User).filter_by(name="ed")).scalars().first()
+        assert our_user == ed_user
+        session.commit()
+    finally:
+        Base.metadata.drop_all(engine_testaccount)
+
+
+def test_orm_one_to_many_relationship(engine_testaccount, db_parameters):
+    """
+    Tests One to Many relationship
+    """
+    Base = declarative_base()
+    prefix = "tbl_"
+
+    class User(Base):
+        __tablename__ = prefix + "user"
+
+        id = Column(Integer, Sequence("user_id_seq"), primary_key=True)
+        name = Column(String)
+        fullname = Column(String)
+
+        def __repr__(self):
+            return f"<User({self.name!r}, {self.fullname!r})>"
+
+    class Address(Base):
+        __tablename__ = prefix + "address"
+
+        id = Column(Integer, Sequence("address_id_seq"), primary_key=True)
+        email_address = Column(String, nullable=False)
+        user_id = Column(Integer, ForeignKey(f"{User.__tablename__}.id"))
+
+        user = relationship(User, backref="addresses")
+
+        def __repr__(self):
+            return f"<Address({repr(self.email_address)})>"
+
+    Base.metadata.create_all(engine_testaccount)
+
+    try:
+        jack = User(name="jack", fullname="Jack Bean")
+        assert jack.addresses == [], "one to many record is empty list"
+
+        jack.addresses = [
+            Address(email_address="jack@gmail.com"),
+            Address(email_address="j25@yahoo.com"),
+            Address(email_address="jack@hotmail.com"),
+        ]
+
+        session = Session(engine_testaccount)
+        session.add(jack)  # cascade each Address into the Session as well
+        session.commit()
+
+        got_jack = session.execute(select(User)).scalars().first()
+        assert got_jack == jack
+
+        bob = User(name="bob", fullname="Bob Dyran")
+
+        session.add(bob)
+        got_bob = session.execute(select(User).filter_by(name="bob")).scalars().first()
+        assert got_bob == bob
+        session.rollback()
+        got_whoever = session.execute(select(User)).scalars().all()
+        assert len(got_whoever) == 1, "number of user"
+        assert got_whoever[0] == jack
+
+        session.delete(jack)
+        session.commit()
+        got_addresses = session.execute(select(Address)).scalars().all()
+        assert len(got_addresses) == 3, (
+            "address records still remain in no " "cascade mode"
+        )
+
+    finally:
+        Base.metadata.drop_all(engine_testaccount)
+
+
+@pytest.mark.aws
+def test_orm_one_to_many_relationship_with_hybrid_table(engine_testaccount, snapshot):
+    """
+    Tests One to Many relationship
+    """
+    Base = declarative_base()
+
+    class User(Base):
+        __tablename__ = "hb_tbl_user"
+
+        @classmethod
+        def __table_cls__(cls, name, metadata, *arg, **kw):
+            return HybridTable(name, metadata, *arg, **kw)
+
+        id = Column(Integer, Sequence("user_id_seq"), primary_key=True)
+        name = Column(String)
+        fullname = Column(String)
+
+        def __repr__(self):
+            return f"<User({self.name!r}, {self.fullname!r})>"
+
+    class Address(Base):
+        __tablename__ = "hb_tbl_address"
+
+        @classmethod
+        def __table_cls__(cls, name, metadata, *arg, **kw):
+            return HybridTable(name, metadata, *arg, **kw)
+
+        id = Column(Integer, Sequence("address_id_seq"), primary_key=True)
+        email_address = Column(String, nullable=False)
+        user_id = Column(Integer, ForeignKey(f"{User.__tablename__}.id"))
+
+        user = relationship(User, backref="addresses")
+
+        def __repr__(self):
+            return f"<Address({repr(self.email_address)})>"
+
+    Base.metadata.create_all(engine_testaccount)
+
+    try:
+        jack = User(name="jack", fullname="Jack Bean")
+        assert jack.addresses == [], "one to many record is empty list"
+
+        jack.addresses = [
+            Address(email_address="jack@gmail.com"),
+            Address(email_address="j25@yahoo.com"),
+            Address(email_address="jack@hotmail.com"),
+        ]
+
+        session = Session(engine_testaccount)
+        session.add(jack)  # cascade each Address into the Session as well
+        session.commit()
+
+        session.delete(jack)
+        session.commit()
+
+        with pytest.raises(exc.ProgrammingError) as exc_info:
+            session.execute(select(Address)).scalars().all()
+
+        assert exc_info.value == snapshot, "Iceberg Table enforce FK constraint"
+
+    finally:
+        Base.metadata.drop_all(engine_testaccount)
+
+
+def test_delete_cascade(engine_testaccount):
+    """
+    Test delete cascade
+    """
+    Base = declarative_base()
+    prefix = "tbl_"
+
+    class User(Base):
+        __tablename__ = prefix + "user"
+
+        id = Column(Integer, Sequence("user_id_seq"), primary_key=True)
+        name = Column(String)
+        fullname = Column(String)
+
+        addresses = relationship(
+            "Address", back_populates="user", cascade="all, delete, delete-orphan"
+        )
+
+        def __repr__(self):
+            return f"<User({self.name!r}, {self.fullname!r})>"
+
+    class Address(Base):
+        __tablename__ = prefix + "address"
+
+        id = Column(Integer, Sequence("address_id_seq"), primary_key=True)
+        email_address = Column(String, nullable=False)
+        user_id = Column(Integer, ForeignKey(f"{User.__tablename__}.id"))
+
+        user = relationship(User, back_populates="addresses")
+
+        def __repr__(self):
+            return f"<Address({repr(self.email_address)})>"
+
+    Base.metadata.create_all(engine_testaccount)
+
+    try:
+        jack = User(name="jack", fullname="Jack Bean")
+        assert jack.addresses == [], "one to many record is empty list"
+
+        jack.addresses = [
+            Address(email_address="jack@gmail.com"),
+            Address(email_address="j25@yahoo.com"),
+            Address(email_address="jack@hotmail.com"),
+        ]
+
+        session = Session(engine_testaccount)
+        session.add(jack)  # cascade each Address into the Session as well
+        session.commit()
+
+        got_jack = session.execute(select(User)).scalars().first()
+        assert got_jack == jack
+
+        session.delete(jack)
+        session.commit()
+        got_addresses = session.execute(select(Address)).scalars().all()
+        assert len(got_addresses) == 0, "no address record"
+    finally:
+        Base.metadata.drop_all(engine_testaccount)
+
+
+@pytest.mark.aws
+def test_delete_cascade_hybrid_table(engine_testaccount):
+    """
+    Test delete cascade
+    """
+    Base = declarative_base()
+    prefix = "hb_tbl_"
+
+    class User(Base):
+        __tablename__ = prefix + "user"
+
+        @classmethod
+        def __table_cls__(cls, name, metadata, *arg, **kw):
+            return HybridTable(name, metadata, *arg, **kw)
+
+        id = Column(Integer, Sequence("user_id_seq"), primary_key=True)
+        name = Column(String)
+        fullname = Column(String)
+
+        addresses = relationship(
+            "Address", back_populates="user", cascade="all, delete, delete-orphan"
+        )
+
+        def __repr__(self):
+            return f"<User({self.name!r}, {self.fullname!r})>"
+
+    class Address(Base):
+        __tablename__ = prefix + "address"
+
+        @classmethod
+        def __table_cls__(cls, name, metadata, *arg, **kw):
+            return HybridTable(name, metadata, *arg, **kw)
+
+        id = Column(Integer, Sequence("address_id_seq"), primary_key=True)
+        email_address = Column(String, nullable=False)
+        user_id = Column(Integer, ForeignKey(f"{User.__tablename__}.id"))
+
+        user = relationship(User, back_populates="addresses")
+
+        def __repr__(self):
+            return f"<Address({repr(self.email_address)})>"
+
+    Base.metadata.create_all(engine_testaccount)
+
+    try:
+        jack = User(name="jack", fullname="Jack Bean")
+        assert jack.addresses == [], "one to many record is empty list"
+
+        jack.addresses = [
+            Address(email_address="jack@gmail.com"),
+            Address(email_address="j25@yahoo.com"),
+            Address(email_address="jack@hotmail.com"),
+        ]
+
+        session = Session(engine_testaccount)
+        session.add(jack)  # cascade each Address into the Session as well
+        session.commit()
+
+        got_jack = session.execute(select(User)).scalars().first()
+        assert got_jack == jack
+
+        session.delete(jack)
+        session.commit()
+        got_addresses = session.execute(select(Address)).scalars().all()
+        assert len(got_addresses) == 0, "no address record"
+    finally:
+        Base.metadata.drop_all(engine_testaccount)
+
+
+@pytest.mark.skipif(
+    True,
+    reason="""
+WIP
+""",
+)
+def test_orm_query(engine_testaccount):
+    """
+    Tests ORM query
+    """
+    Base = declarative_base()
+
+    class User(Base):
+        __tablename__ = "user"
+
+        id = Column(Integer, primary_key=True)
+        name = Column(String)
+        fullname = Column(String)
+
+        def __repr__(self):
+            return f"<User({self.name!r}, {self.fullname!r})>"
+
+    Base.metadata.create_all(engine_testaccount)
+
+    # TODO: insert rows
+
+    session = Session(engine_testaccount)
 
     # TODO: query.all()
-    for name, fullname in session.query(User.name, User.fullname):
+    result = session.execute(select(User.name, User.fullname))
+    for name, fullname in result.scalars().all():
         print(name, fullname)
 
         # TODO: session.query.one() must return always one. NoResultFound and
@@ -376,10 +731,11 @@ def test_schema_including_db(engine_testaccount, db_parameters):
     try:
         ed_user = User(name="ed", fullname="Edward Jones")
 
-        session = Session(bind=engine_testaccount)
+        session = Session(engine_testaccount)
         session.add(ed_user)
+        session.commit()
 
-        ret_user = session.query(User.id, User.name).first()
+        ret_user = session.execute(select(User.id, User.name)).first()
         assert ret_user[0] == 1
         assert ret_user[1] == "ed"
 
@@ -408,9 +764,9 @@ def test_schema_including_dot(engine_testaccount, db_parameters):
         name = Column(String)
         fullname = Column(String)
 
-    session = Session(bind=engine_testaccount)
-    query = session.query(User.id)
-    assert str(query).startswith(
+    session = Session(engine_testaccount)
+    query = select(User.id)
+    assert str(query.compile(engine_testaccount)).startswith(
         'SELECT {db}."{schema}.{schema}".{db}.users.id'.format(
             db=db_parameters["database"].lower(), schema=db_parameters["schema"].lower()
         )
@@ -439,11 +795,11 @@ def test_schema_translate_map(engine_testaccount, db_parameters):
     with engine_testaccount.connect().execution_options(
         schema_translate_map={schema_map: db_parameters["schema"]}
     ) as con:
-        session = Session(bind=con)
+        session = Session(con)
         with con.begin():
             Base.metadata.create_all(con)
             try:
-                query = session.query(User)
+                query = select(User)
 
                 # insert some data in a way that makes sure that we're working in the right testing schema
                 con.execute(
@@ -453,12 +809,12 @@ def test_schema_translate_map(engine_testaccount, db_parameters):
                 )
 
                 # assert the precompiled query contains the schema_map and not the actual schema
-                assert str(query).startswith(
+                assert str(query.compile(con)).startswith(
                     f'SELECT "{schema_map}".{User.__tablename__}'
                 )
 
                 # run query and see that schema translation was done corectly
-                results = query.all()
+                results = session.execute(query).scalars().all()
                 assert len(results) == 1
                 user = results.pop()
                 assert user.id == 0
@@ -484,7 +840,7 @@ def test_outer_lateral_join(engine_testaccount, caplog):
         name = Column(String)
 
     Base.metadata.create_all(engine_testaccount)
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
     e1 = Employee(employee_id=101, last_name="Richards")
     d1 = Department(department_id=1, name="Engineering")
     session.add_all([e1, d1])
@@ -512,7 +868,7 @@ def test_outer_lateral_join(engine_testaccount, caplog):
     assert compiled_stmt in compiled_stmts
 
     with caplog.at_level(logging.DEBUG):
-        assert [res for res in session.execute(query)]
+        assert [res for res in session.execute(query).all()]
     assert (
         "SELECT employees.employee_id, departments.department_id FROM departments"
         in caplog.text
@@ -534,7 +890,7 @@ def test_lateral_join_without_condition(engine_testaccount, caplog):
 
     Base.metadata.create_all(engine_testaccount)
     lateral_table = func.flatten(
-        func.PARSE_JSON(Employee.content), outer=False
+        func.parse_json(Employee.content), outer=False
     ).lateral()
     query = (
         select(
@@ -544,9 +900,9 @@ def test_lateral_join_without_condition(engine_testaccount, caplog):
         .join(lateral_table)
         .where(Employee.uid == "123")
     )
-    session = Session(bind=engine_testaccount)
+    session = Session(engine_testaccount)
     with caplog.at_level(logging.DEBUG):
-        session.execute(query)
+        session.execute(query).all()
     assert (
         '[SELECT "Employee".uid FROM "Employee" JOIN LATERAL flatten(PARSE_JSON("Employee"'
         in caplog.text

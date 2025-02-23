@@ -441,7 +441,7 @@ def test_reflextion(engine_testaccount):
     Tests Reflection
     """
     with engine_testaccount.connect() as conn:
-        engine_testaccount.execute(
+        conn.execute(
             textwrap.dedent(
                 """\
             CREATE OR REPLACE TABLE user (
@@ -457,7 +457,7 @@ def test_reflextion(engine_testaccount):
             user_reflected = Table("user", meta, autoload_with=engine_testaccount)
             assert user_reflected.c == ["user.id", "user.name", "user.fullname"]
         finally:
-            conn.execute("DROP TABLE IF EXISTS user")
+            conn.execute(text("DROP TABLE IF EXISTS user"))
 
 
 def test_inspect_column(engine_testaccount):
@@ -622,7 +622,7 @@ def test_naming_convention_constraint_names(engine_testaccount):
         "addresses",
         metadata,
         Column("id", Integer, primary_key=True),
-        Column("user_id", None, ForeignKey(users.c.id)),
+        Column("user_id", ForeignKey(users.c.id)),
         Column("email_address", String, nullable=False, unique=True),
     )
     metadata.create_all(engine_testaccount)
@@ -852,7 +852,6 @@ def test_create_table_with_schema(engine_testaccount, db_parameters):
             metadata.drop_all(engine_testaccount)
             conn.execute(text(f'DROP SCHEMA IF EXISTS "{new_schema}"'))
 
-
 @pytest.mark.skipif(
     os.getenv("SNOWFLAKE_GCP") is not None,
     reason="PUT and GET is not supported for GCP yet",
@@ -861,13 +860,13 @@ def test_copy(engine_testaccount):
     """
     COPY must be in a transaction
     """
-    with engine_testaccount.connect() as conn:
-        metadata = MetaData()
-        users, addresses = _create_users_addresses_tables_without_sequence(
-            engine_testaccount, metadata
-        )
+    metadata = MetaData()
+    users, addresses = _create_users_addresses_tables_without_sequence(
+        engine_testaccount, metadata
+    )
 
-        try:
+    try:
+        with engine_testaccount.connect() as conn:
             with conn.begin():
                 conn.execute(
                     text(
@@ -875,11 +874,11 @@ def test_copy(engine_testaccount):
                     )
                 )
                 conn.execute(text("COPY INTO users"))
-                results = conn.execute(text("SELECT * FROM USERS")).fetchall()
-                assert results is not None and len(results) > 0
-        finally:
-            addresses.drop(engine_testaccount)
-            users.drop(engine_testaccount)
+                results = conn.execute(text("SELECT * FROM USERS"))
+                assert results is not None and len(results.all()) > 0
+    finally:
+        addresses.drop(engine_testaccount)
+        users.drop(engine_testaccount)
 
 
 @pytest.mark.skip(
@@ -894,24 +893,25 @@ def test_transaction(engine_testaccount, db_parameters):
     engine_testaccount.execute(
         text(f"CREATE TABLE {db_parameters['name']} (c1 number)")
     )
-    trans = engine_testaccount.connect().begin()
-    try:
-        engine_testaccount.execute(
-            text(f"INSERT INTO {db_parameters['name']} VALUES(123)")
-        )
-        trans.commit()
-        engine_testaccount.execute(
-            text(f"INSERT INTO {db_parameters['name']} VALUES(456)")
-        )
-        trans.rollback()
-        results = engine_testaccount.execute(
-            f"SELECT * FROM {db_parameters['name']}"
-        ).fetchall()
-        assert results == [(123,)]
-    finally:
-        engine_testaccount.execute(
-            text(f"DROP TABLE IF EXISTS {db_parameters['name']}")
-        )
+    with engine_testaccount.connect() as conn:
+        trans = conn.begin()
+        try:
+            conn.execute(
+                text(f"INSERT INTO {db_parameters['name']} VALUES(123)")
+            )
+            trans.commit()
+            conn.execute(
+                text(f"INSERT INTO {db_parameters['name']} VALUES(456)")
+            )
+            trans.rollback()
+            results = conn.execute(
+                text(f"SELECT * FROM {db_parameters['name']}")
+            ).all()
+            assert results == [(123,)]
+        finally:
+            engine_testaccount.execute(
+                text(f"DROP TABLE IF EXISTS {db_parameters['name']}")
+            )
 
 
 def test_get_schemas(engine_testaccount):
@@ -929,15 +929,16 @@ def test_get_schemas(engine_testaccount):
 
 def test_column_metadata(engine_testaccount):
     from sqlalchemy.orm import declarative_base
+    from sqlalchemy.orm import Mapped, mapped_column
 
     Base = declarative_base()
 
     class Appointment(Base):
         __tablename__ = "appointment"
-        id = Column(Numeric(38, 3), primary_key=True)
-        string_with_len = Column(String(100))
-        binary_data = Column(LargeBinary)
-        real_data = Column(REAL)
+        id: Mapped[int] = mapped_column(Numeric(38, 3), primary_key=True)
+        string_with_len: Mapped[str] = mapped_column(String(100))
+        binary_data: Mapped[bytes] = mapped_column(LargeBinary)
+        real_data: Mapped[float] = mapped_column(REAL)
 
     Base.metadata.create_all(engine_testaccount)
 
@@ -1109,7 +1110,8 @@ def test_connection_timeout_error(region):
     )
 
     with pytest.raises(OperationalError) as excinfo:
-        engine.connect()
+        with engine.connect():
+            pass
 
     assert excinfo.value.orig.errno == 250001
     assert "Could not connect to Snowflake backend" in excinfo.value.orig.msg
@@ -1121,7 +1123,6 @@ def test_load_dialect():
     Test loading Snowflake SQLAlchemy dialect class
     """
     assert isinstance(dialects.registry.load("snowflake")(), dialect)
-
 
 @pytest.mark.parametrize("conditional_flag", [True, False])
 @pytest.mark.parametrize(
@@ -1636,7 +1637,7 @@ CREATE TEMP TABLE {table_name} (
 def test_result_type_and_value(engine_testaccount):
     with engine_testaccount.connect() as conn:
         table_name = random_string(5)
-        conn.exec_driver_sql(
+        conn.execute(text(
             f"""\
 CREATE TEMP TABLE {table_name} (
     C1 BIGINT, C2 BINARY, C3 BOOLEAN, C4 CHAR, C5 CHARACTER, C6 DATE, C7 DATETIME, C8 DEC(12,3),
@@ -1646,7 +1647,7 @@ CREATE TEMP TABLE {table_name} (
     C32 GEOMETRY
 )
 """
-        )
+        ))
         table_reflected = Table(table_name, MetaData(), autoload_with=conn)
         current_date = date.today()
         current_utctime = datetime.utcnow()
@@ -1670,7 +1671,7 @@ CREATE TEMP TABLE {table_name} (
         GEOMETRY_VALUE = "POINT(-94.58473 39.08985)"
         GEOMETRY_RESULT_VALUE = '{"coordinates": [-94.58473,39.08985],"type": "Point"}'
 
-        ins = table_reflected.insert().values(
+        ins = insert(table_reflected).values(
             c1=MAX_INT_VALUE,  # BIGINT
             c2=BINARY_VALUE,  # BINARY
             c3=True,  # BOOLEAN
@@ -1753,7 +1754,7 @@ SELECT PARSE_JSON('{{"vk1":100, "vk2":200, "vk3":300}}'),
 {{"k":2, "v":"str2"}},
 {{"k":3, "v":"str3"}}]'
 )"""
-        conn.exec_driver_sql(sql)
+        conn.execute(text(sql))
         results = conn.execute(select(table_reflected)).fetchall()
         assert len(results) == 2
         data = json.loads(results[-1][27])
@@ -1768,22 +1769,22 @@ SELECT PARSE_JSON('{{"vk1":100, "vk2":200, "vk3":300}}'),
 def test_normalize_and_denormalize_empty_string_column_name(engine_testaccount):
     with engine_testaccount.connect() as conn:
         table_name = random_string(5)
-        conn.exec_driver_sql(
+        conn.execute(text(
             f"""
 CREATE OR REPLACE TEMP TABLE {table_name}
 (EMPID INT, DEPT TEXT, JAN INT, FEB INT)
 """
-        )
-        conn.exec_driver_sql(
+        ))
+        conn.execute(text(
             f"""
 INSERT INTO {table_name} VALUES
     (1, 'ELECTRONICS', 100, 200),
     (2, 'CLOTHES', 100, 300)
 """
-        )
-        results = conn.exec_driver_sql(
+        ))
+        results = conn.execute(text(
             f'SELECT * FROM {table_name} UNPIVOT(SALES FOR "" IN (JAN, FEB)) ORDER BY EMPID;'
-        ).fetchall()  # normalize_name will be called
+        )).fetchall()  # normalize_name will be called
         assert results == [
             (1, "ELECTRONICS", "JAN", 100),
             (1, "ELECTRONICS", "FEB", 200),
@@ -1791,12 +1792,12 @@ INSERT INTO {table_name} VALUES
             (2, "CLOTHES", "FEB", 300),
         ]
 
-        conn.exec_driver_sql(
+        conn.execute(text(
             f"""
 CREATE OR REPLACE TEMP TABLE {table_name}
 (COL INT, "" INT)
 """
-        )
+        ))
         inspector = inspect(conn)
         columns = inspector.get_columns(table_name)  # denormalize_name will be called
         assert (
@@ -1813,11 +1814,11 @@ def test_snowflake_sqlalchemy_as_valid_client_type():
     )
     with engine.connect() as conn:
         with pytest.raises(snowflake.connector.errors.NotSupportedError):
-            conn.exec_driver_sql("select 1").cursor.fetch_pandas_all()
+            conn.execute(text("select 1")).cursor.fetch_pandas_all()
 
     engine = create_engine(URL(**CONNECTION_PARAMETERS))
     with engine.connect() as conn:
-        conn.exec_driver_sql("select 1").cursor.fetch_pandas_all()
+        conn.execute(text("select 1")).cursor.fetch_pandas_all()
 
     try:
         snowflake.sqlalchemy.snowdialect._ENABLE_SQLALCHEMY_AS_APPLICATION_NAME = False
@@ -1848,7 +1849,7 @@ def test_snowflake_sqlalchemy_as_valid_client_type():
         )
         engine = create_engine(URL(**CONNECTION_PARAMETERS))
         with engine.connect() as conn:
-            conn.exec_driver_sql("select 1").cursor.fetch_pandas_all()
+            conn.execute(text("select 1")).cursor.fetch_pandas_all()
             assert (
                 conn.connection.driver_connection._internal_application_name
                 == "PythonConnector"
@@ -1866,7 +1867,6 @@ def test_snowflake_sqlalchemy_as_valid_client_type():
         snowflake.connector.connection.DEFAULT_CONFIGURATION[
             "internal_application_version"
         ] = origin_internal_app_version
-
 
 @pytest.mark.parametrize(
     "operation",
@@ -1890,7 +1890,7 @@ def test_true_division_operation(engine_testaccount, operation):
     # with pytest.warns(PendingDeprecationWarning, match=expected_warning):
     with engine_testaccount.connect() as conn:
         eq_(
-            conn.execute(select(operation[0] / operation[1])).fetchall(),
+            conn.execute(select((operation[0] / operation[1]))).fetchall(),
             [((operation[2]),)],
         )
 
