@@ -44,7 +44,7 @@ def config_patched__init__(self, db, db_opts, options, file_config):
     self.test_schema_2 = TEST_SCHEMA_2
 
     self.is_async = db.dialect.is_async and not util.asbool(
-        db.url.query.get("async_fallback", False)
+        db.url.query_params.get("async_fallback", False)
     )
 
 

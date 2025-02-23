@@ -154,7 +154,7 @@ class LikeFunctionsTest(_LikeFunctionsTest):
 class SimpleUpdateDeleteTest(_SimpleUpdateDeleteTest):
     def test_update(self, connection):
         t = self.tables.plain_pk
-        r = connection.execute(t.update().where(t.c.id == 2), dict(data="d2_new"))
+        r = connection.execute(t.update().where(t.c.id == 2).values(data="d2_new"))
         assert not r.is_insert
         # snowflake returns a row with numbers of rows updated and number of multi-joined rows updated
         assert r.returns_rows
