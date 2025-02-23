@@ -132,7 +132,7 @@ https://docs.snowflake.com/en/release-notes/bcr-bundles/2023_04/bcr-1057
 
 
 # handle Snowflake BCR bcr-1057
-@CompileState.plugin_for("default", "select")
+@CompileState.plugin_for("select", dialect="default")
 class SnowflakeSelectState(SelectState):
     def _setup_joins(self, args, raw_columns):
         for right, onclause, left, flags in args:
@@ -236,7 +236,7 @@ class SnowflakeSelectState(SelectState):
 
 
 # handle Snowflake BCR bcr-1057
-@sql.base.CompileState.plugin_for("orm", "select")
+@sql.base.CompileState.plugin_for("select", dialect="orm")
 class SnowflakeORMSelectCompileState(context.ORMSelectCompileState):
     def _join_determine_implicit_left_side(
         self, entities_collection, left, right, onclause
@@ -599,9 +599,7 @@ class SnowflakeCompiler(compiler.SQLCompiler):
 
         partition_by_value = None
         if isinstance(copy_into.partition_by, (BindParameter, Executable)):
-            partition_by_value = copy_into.partition_by.compile(
-                compile_kwargs={"literal_binds": True}
-            )
+            partition_by_value = self.process(copy_into.partition_by, literal_binds=True)
         elif copy_into.partition_by is not None:
             partition_by_value = copy_into.partition_by
 
@@ -1129,7 +1127,7 @@ class SnowflakeTypeCompiler(compiler.GenericTypeCompiler):
     def visit_MAP(self, type_, **kw):
         not_null = f" {NOT_NULL}" if type_.not_null else ""
         return (
-            f"MAP({type_.key_type.compile()}, {type_.value_type.compile()}{not_null})"
+            f"MAP({self.process(type_.key_type)}, {self.process(type_.value_type)}{not_null})"
         )
 
     def visit_ARRAY(self, type_, **kw):
@@ -1139,7 +1137,7 @@ class SnowflakeTypeCompiler(compiler.GenericTypeCompiler):
         if type_.is_semi_structured:
             return "ARRAY"
         not_null = f" {NOT_NULL}" if type_.not_null else ""
-        return f"ARRAY({type_.value_type.compile()}{not_null})"
+        return f"ARRAY({self.process(type_.value_type)}{not_null})"
 
     def visit_OBJECT(self, type_, **kw):
         if type_.is_semi_structured:
@@ -1148,7 +1146,7 @@ class SnowflakeTypeCompiler(compiler.GenericTypeCompiler):
             contents = []
             for key in type_.items_types:
 
-                row_text = f"{key} {type_.items_types[key][0].compile()}"
+                row_text = f"{key} {self.process(type_.items_types[key][0])}"
                 # Type and not null is specified
                 if len(type_.items_types[key]) > 1:
                     row_text += f"{' NOT NULL' if type_.items_types[key][1] else ''}"

@@ -36,7 +36,6 @@ from .custom_commands import (  # noqa
     CreateFileFormat,
     CreateStage,
     CSVFormatter,
-    ExternalStage,
     JSONFormatter,
     MergeInto,
     PARQUETFormatter,

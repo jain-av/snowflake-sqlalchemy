@@ -4,7 +4,7 @@
 from typing import Optional, Tuple, Union
 
 import sqlalchemy.types as sqltypes
-import sqlalchemy.util as util
+from sqlalchemy import util
 from sqlalchemy.types import TypeEngine
 
 TEXT = sqltypes.VARCHAR

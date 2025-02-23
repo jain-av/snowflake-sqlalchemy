@@ -154,9 +154,10 @@ class SnowflakeDialect(default.DefaultDialect):
         isolation_level: Optional[str] = SnowflakeIsolationLevel.READ_COMMITTED.value,
         **kwargs: Any,
     ):
-        super().__init__(isolation_level=isolation_level, **kwargs)
+        super().__init__(**kwargs)
         self.force_div_is_floordiv = force_div_is_floordiv
         self.div_is_floordiv = force_div_is_floordiv
+        self.isolation_level = isolation_level
 
     def initialize(self, connection):
         super().initialize(connection)
@@ -318,7 +319,7 @@ class SnowflakeDialect(default.DefaultDialect):
     def _current_database_schema(self, connection, **kw):
         res = connection.execute(
             text("select current_database(), current_schema();")
-        ).fetchone()
+        ).scalar_one()
         return (
             self.normalize_name(res[0]),
             self.normalize_name(res[1]),
@@ -752,7 +753,7 @@ class SnowflakeDialect(default.DefaultDialect):
 
         name_to_index_map = self._map_name_to_idx(result)
         tables = {}
-        for row in result.cursor.fetchall():
+        for row in result.mappings():
             table_name = self.normalize_name(str(row[name_to_index_map["name"]]))
             table_prefixes = self.get_prefixes_from_data(name_to_index_map, row)
             tables[table_name] = {"prefixes": table_prefixes}
@@ -785,7 +786,7 @@ class SnowflakeDialect(default.DefaultDialect):
                 text("SHOW /* sqlalchemy:get_view_names */ VIEWS")
             )
 
-        return [self.normalize_name(row[1]) for row in cursor]
+        return [self.normalize_name(row._mapping["name"]) for row in cursor]
 
     @reflection.cache
     def get_view_definition(self, connection, view_name, schema=None, **kw):
@@ -812,7 +813,7 @@ class SnowflakeDialect(default.DefaultDialect):
         try:
             ret = cursor.fetchone()
             if ret:
-                return ret[n2i["text"]]
+                return ret._mapping["text"]
         except Exception:
             pass
         return None
@@ -829,8 +830,8 @@ class SnowflakeDialect(default.DefaultDialect):
         ret = []
         n2i = self.__class__._map_name_to_idx(cursor)
         for row in cursor:
-            if row[n2i["kind"]] == "TEMPORARY":
-                ret.append(self.normalize_name(row[n2i["name"]]))
+            if row._mapping["kind"] == "TEMPORARY":
+                ret.append(self.normalize_name(row._mapping["name"]))
 
         return ret
 
@@ -842,7 +843,7 @@ class SnowflakeDialect(default.DefaultDialect):
             text("SHOW /* sqlalchemy:get_schema_names */ SCHEMAS")
         )
 
-        return [self.normalize_name(row[1]) for row in cursor]
+        return [self.normalize_name(row._mapping["name"]) for row in cursor]
 
     @reflection.cache
     def get_sequence_names(self, connection, schema=None, **kw):
@@ -851,7 +852,7 @@ class SnowflakeDialect(default.DefaultDialect):
         )
         try:
             cursor = connection.execute(text(sql_command))
-            return [self.normalize_name(row[0]) for row in cursor]
+            return [self.normalize_name(row._mapping["name"]) for row in cursor]
         except sa_exc.ProgrammingError as pe:
             if pe.orig.errno == 2003:
                 # Schema does not exist
@@ -951,23 +952,23 @@ class SnowflakeDialect(default.DefaultDialect):
         indexes = {}
 
         for row in result.cursor.fetchall():
-            table_name = self.normalize_name(str(row[n2i["table"]]))
+            table_name = self.normalize_name(str(row._mapping["table"]))
             if (
-                row[n2i["name"]] == f'SYS_INDEX_{row[n2i["table"]]}_PRIMARY'
+                row._mapping["name"] == f'SYS_INDEX_{row._mapping["table"]}_PRIMARY'
                 or table_name not in filter_names
                 or table_name not in hybrid_table_names
             ):
                 continue
             index = {
-                "name": row[n2i["name"]],
-                "unique": row[n2i["is_unique"]] == "Y",
+                "name": row._mapping["name"],
+                "unique": row._mapping["is_unique"] == "Y",
                 "column_names": [
                     self.normalize_name(column)
-                    for column in parse_index_columns(row[n2i["columns"]])
+                    for column in parse_index_columns(row._mapping["columns"])
                 ],
                 "include_columns": [
                     self.normalize_name(column)
-                    for column in parse_index_columns(row[n2i["included_columns"]])
+                    for column in parse_index_columns(row._mapping["included_columns"])
                 ],
                 "dialect_options": {},
             }

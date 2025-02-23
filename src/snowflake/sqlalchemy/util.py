@@ -15,7 +15,8 @@ from sqlalchemy.orm.util import attributes
 from sqlalchemy.sql import util as sql_util
 from sqlalchemy.sql.base import _expand_cloned, _from_objects
 from sqlalchemy.sql.elements import _find_columns
-from sqlalchemy.sql.selectable import Join, Lateral, coercions, operators, roles
+from sqlalchemy.sql.selectable import Join, Lateral, roles
+from sqlalchemy.sql import operators, coercions
 
 from snowflake.connector.compat import IS_STR
 from snowflake.connector.connection import SnowflakeConnection
@@ -149,7 +150,7 @@ def _find_left_clause_to_join_from(clauses, join_to, onclause):
 
     """
     idx = []
-    selectables = set(_from_objects(join_to))
+    selectables = set(_from_objects(join_to));
 
     # if we are given more than one target clause to join
     # from, use the onclause to provide a more specific answer.
